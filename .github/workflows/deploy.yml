@@ -1,0 +1,99 @@
+name: Build, Test, and Deploy ScholarSpark AI to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-build:
+    name: Lint, Test & Production Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Locked Dependencies
+        run: npm ci
+
+      - name: Run Type Checking & Linter
+        run: npm run lint
+
+      - name: Run Production Frontend Build
+        run: npm run build
+
+      - name: Verify Build Artifacts
+        run: |
+          test -d dist || { echo "Build artifact 'dist/' missing!"; exit 1; }
+          test -f dist/index.html || { echo "Entry point 'dist/index.html' missing!"; exit 1; }
+          echo "Production frontend build verified successfully."
+
+  deploy-cloud-run:
+    name: Deploy to Google Cloud Run
+    needs: validate-and-build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # Workload Identity Federation (Recommended: Zero Long-Lived Keys in GitHub)
+      - name: Authenticate to Google Cloud via WIF
+        id: auth
+        uses: google-github-actions/auth@v2
+        continue-on-error: true
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # Fallback to Service Account Key if WIF is not configured
+      - name: Fallback Authentication via Service Account Key
+        if: steps.auth.outcome == 'failure' && secrets.GCP_SA_KEY != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Authorize Docker to Artifact Registry
+        run: |
+          if [ -n "${{ secrets.GCP_REGION }}" ]; then
+            gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+          fi
+
+      - name: Build and Deploy to Cloud Run
+        if: env.GCP_PROJECT_ID != ''
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE_NAME || 'scholarspark-ai' }}
+          REGION: ${{ secrets.GCP_REGION || 'europe-west3' }}
+        run: |
+          gcloud run deploy "$SERVICE_NAME" \
+            --source . \
+            --platform managed \
+            --region "$REGION" \
+            --project "$GCP_PROJECT_ID" \
+            --allow-unauthenticated \
+            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+            --port 3000

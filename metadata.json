@@ -1,0 +1,12 @@
+{
+  "name": "ScholarSpark AI",
+  "description": "Understand more. Achieve more. The premier AI study companion for ECZ (Zambia) and Cambridge IGCSE students featuring AI tutoring, exam practice, verified past papers, homework scanner, weakness detector, voice tutor, and study planner.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+
