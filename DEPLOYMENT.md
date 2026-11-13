@@ -41,20 +41,28 @@ In your GitHub repository under **Settings > Branches > Add branch protection ru
 
 ---
 
-## 4. GitHub Pages Deployment (Static Frontend)
+## 4. GitHub Pages Deployment (Deploy from a Branch or Actions)
 
 ScholarSpark AI supports GitHub Pages out of the box via:
-- Relative asset paths & configurable base (`VITE_BASE_PATH`, defaulting to `./`).
+- Relative asset paths (`base: './'`) and pre-built static output in `/docs` (with `docs/.nojekyll`).
 - Hash-based module routing (`#dashboard`, `#tutor`, `#practice`, etc.) so browser refreshes and direct links never 404 on GitHub Pages.
-- Optional remote API routing via `VITE_API_BASE_URL` (because GitHub Pages hosts static files only and cannot execute Express or store `GEMINI_API_KEY`).
+- Automated `gh-pages` branch publishing in `.github/workflows/deploy.yml` (`publish-gh-pages-branch`).
+- Runtime or build-time backend routing (`VITE_API_BASE_URL` or Settings > AI Backend Connection) because GitHub Pages hosts static files only and cannot run Express or store `GEMINI_API_KEY`.
 
-### Steps to Enable GitHub Pages
-1. In your GitHub repository, open **Settings > Pages** and set **Build and deployment > Source** to **GitHub Actions**.
-2. Open **Settings > Secrets and variables > Actions > Variables** and add:
-   - `ENABLE_GITHUB_PAGES` = `true`
-   - `VITE_API_BASE_URL` = `https://your-cloud-run-service-url.run.app` (required for live AI features from GitHub Pages; offline modules like Flashcards, Study Planner, Exam Countdown, and Local Notes work without a backend).
-   - `ALLOWED_ORIGINS` = `https://YOUR_GITHUB_USERNAME.github.io` (set on your Cloud Run backend so browser CORS requests from GitHub Pages are allowed).
-3. Push to `main` (or trigger **Actions > Build, Test, and Deploy ScholarSpark AI > Run workflow**).
+### Option A: Deploy Directly from `/docs` on Your Branch (Fastest)
+1. Push this repository to GitHub (via **Save to GitHub** in AI Studio) onto `main` or any branch.
+2. In your GitHub repository, open **Settings > Pages**.
+3. Under **Build and deployment > Source**, choose **Deploy from a branch**.
+4. Select your branch (e.g. `main`), set folder to **`/docs`**, and click **Save**.
+5. *(Optional for live AI features)*: Deploy your Cloud Run backend (Section 5) and either set `VITE_API_BASE_URL` or paste your Cloud Run URL inside the app under **Settings > AI Backend Connection**.
+
+### Option B: Deploy from the Automated `gh-pages` Branch
+1. Push to `main`, `master`, `publish`, or `production`. The workflow automatically builds and pushes the latest static site to the **`gh-pages`** branch.
+2. In GitHub **Settings > Pages**, choose **Deploy from a branch**, select **`gh-pages`** and **`/ (root)`**, and click **Save**.
+
+### Option C: Deploy via Native GitHub Actions Pages
+1. In GitHub **Settings > Pages**, set Source to **GitHub Actions**.
+2. In **Settings > Secrets and variables > Actions > Variables**, add `ENABLE_GITHUB_PAGES` = `true` (and optionally `VITE_API_BASE_URL` pointing to your Cloud Run backend).
 
 ---
 

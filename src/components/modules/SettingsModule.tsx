@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
+  getApiBaseUrl,
+  setCustomApiBaseUrl,
+  checkBackendHealth,
+  fetchQuotaStatus,
+} from '../../services/api';
+import {
   Settings,
   User,
   Shield,
   Download,
   Upload,
   Crown,
-  RotateCcw,
   CheckCircle2,
-  AlertTriangle,
-  GraduationCap,
+  Server,
 } from 'lucide-react';
 
 export const SettingsModule: React.FC = () => {
@@ -23,6 +27,7 @@ export const SettingsModule: React.FC = () => {
     importDataJson,
     quotaRemaining,
     quotaLimit,
+    setQuotaInfo,
   } = useApp();
 
   const [name, setName] = useState(profile.name);
@@ -30,6 +35,10 @@ export const SettingsModule: React.FC = () => {
   const [examYear, setExamYear] = useState(profile.targetExamYear);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  const [backendUrl, setBackendUrl] = useState(getApiBaseUrl());
+  const [backendTestMsg, setBackendTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testingBackend, setTestingBackend] = useState(false);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +49,27 @@ export const SettingsModule: React.FC = () => {
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const handleSaveBackendUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTestingBackend(true);
+    setBackendTestMsg(null);
+    const trimmed = backendUrl.trim().replace(/\/$/, '');
+    if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+      setBackendTestMsg({ ok: false, text: 'Backend URL must start with https:// or http://' });
+      setTestingBackend(false);
+      return;
+    }
+
+    setCustomApiBaseUrl(trimmed);
+    const result = await checkBackendHealth(trimmed);
+    setBackendTestMsg({ ok: result.ok, text: result.message });
+    if (result.ok) {
+      const q = await fetchQuotaStatus();
+      if (q) setQuotaInfo(q.remaining, q.limit);
+    }
+    setTestingBackend(false);
   };
 
   const handleExportBackup = () => {
@@ -82,7 +112,7 @@ export const SettingsModule: React.FC = () => {
             <h1 className="text-lg font-bold text-white">Student Profile & Settings</h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Manage your student identity, data backups, and subscription tier.
+            Manage your student identity, data backups, backend connection, and usage quota.
           </p>
         </div>
       </div>
@@ -129,7 +159,7 @@ export const SettingsModule: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
                     Target Exam Year:
@@ -180,7 +210,7 @@ export const SettingsModule: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Plan Status & Backups (5 cols) */}
+        {/* Right: Plan Status, Backend Endpoint & Backups (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
           {/* Plan Status */}
           <div className="p-6 rounded-2xl bg-[#0F1E36] border border-slate-800 space-y-4 shadow-xl">
@@ -212,6 +242,43 @@ export const SettingsModule: React.FC = () => {
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
               Daily usage limits are enforced server-side. ScholarSpark Pro upgrades require verified billing setup.
             </div>
+          </div>
+
+          {/* Connected Backend Server (for GitHub Pages static branch hosts) */}
+          <div className="p-6 rounded-2xl bg-[#0F1E36] border border-slate-800 space-y-3 shadow-xl">
+            <h3 className="font-bold text-sm text-white flex items-center gap-2">
+              <Server className="w-4 h-4 text-teal-400" /> AI Backend Connection
+            </h3>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Leave blank when using the full-stack Cloud Run / AI Studio server. If hosted statically on GitHub Pages, enter your Cloud Run backend URL to enable live AI features.
+            </p>
+            <form onSubmit={handleSaveBackendUrl} className="space-y-2">
+              <input
+                type="url"
+                value={backendUrl}
+                onChange={(e) => setBackendUrl(e.target.value)}
+                placeholder="https://your-service.run.app (optional)"
+                className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-teal-400 font-mono"
+              />
+              <button
+                type="submit"
+                disabled={testingBackend}
+                className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 font-semibold text-xs border border-slate-700 transition-colors disabled:opacity-50"
+              >
+                {testingBackend ? 'Testing Connection...' : 'Save & Test Backend Connection'}
+              </button>
+            </form>
+            {backendTestMsg && (
+              <div
+                className={`p-2.5 rounded-lg text-[11px] border ${
+                  backendTestMsg.ok
+                    ? 'bg-emerald-950/50 border-emerald-800 text-emerald-300'
+                    : 'bg-amber-950/50 border-amber-800 text-amber-300'
+                }`}
+              >
+                {backendTestMsg.text}
+              </div>
+            )}
           </div>
 
           {/* Backup & Data Export */}

@@ -4,13 +4,17 @@ on:
   push:
     branches:
       - main
+      - master
+      - publish
+      - production
   pull_request:
     branches:
       - main
+      - master
   workflow_dispatch:
     inputs:
       deploy_target:
-        description: 'Optional deployment target override (auto, pages, cloud-run, all)'
+        description: 'Optional deployment target override (auto, pages, branch, cloud-run, all)'
         required: false
         default: 'auto'
 
@@ -56,11 +60,55 @@ jobs:
           kill $SERVER_PID || true
           echo "Production build and server health check verified successfully."
 
-  deploy-github-pages:
-    name: Deploy Frontend to GitHub Pages
+  publish-gh-pages-branch:
+    name: Publish Static Build to gh-pages Branch
     needs: validate-and-build
     if: >-
-      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.ref != 'refs/heads/gh-pages' &&
+      github.event.inputs.deploy_target != 'cloud-run'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Locked Dependencies
+        run: npm ci
+
+      - name: Build Static Frontend for GitHub Pages Branch
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || '' }}
+        run: |
+          npm run build
+          touch dist/.nojekyll
+
+      - name: Push Build Output to gh-pages Branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          git init -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish ScholarSpark AI static build from ${{ github.ref_name }} (${{ github.sha }})"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" gh-pages
+
+  deploy-github-pages:
+    name: Deploy Frontend via GitHub Pages Actions
+    needs: validate-and-build
+    if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       (vars.ENABLE_GITHUB_PAGES == 'true' || github.event.inputs.deploy_target == 'pages' || github.event.inputs.deploy_target == 'all')
     runs-on: ubuntu-latest
@@ -109,9 +157,10 @@ jobs:
     name: Deploy Full-Stack Service to Google Cloud Run
     needs: validate-and-build
     if: >-
-      github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
-      github.event.inputs.deploy_target != 'pages'
+      github.ref != 'refs/heads/gh-pages' &&
+      github.event.inputs.deploy_target != 'pages' &&
+      github.event.inputs.deploy_target != 'branch'
     runs-on: ubuntu-latest
 
     permissions:

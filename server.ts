@@ -12,15 +12,22 @@ const __dirname = path.dirname(__filename);
 export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-// Security & CORS configuration for full-stack and static GitHub Pages deployments
+// Security & CORS configuration for full-stack and GitHub Pages branch deployments
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
 
+function isAllowedOrigin(origin: string): boolean {
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    return true;
+  }
+  return /^https:\/\/[a-zA-Z0-9-]+\.github\.io$/.test(origin);
+}
+
 app.use((req: Request, res: Response, next: () => void) => {
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes('*') || allowedOrigins.includes(origin))) {
+  if (origin && isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }

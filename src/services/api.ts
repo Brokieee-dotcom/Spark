@@ -3,13 +3,62 @@ export interface ApiOptions {
   retries?: number;
 }
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_BASE_STORAGE_KEY = 'scholarspark_api_base_url';
+const ENV_API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+
+export function getApiBaseUrl(): string {
+  if (ENV_API_BASE) return ENV_API_BASE;
+  if (typeof window !== 'undefined') {
+    const stored = window.localStorage.getItem(API_BASE_STORAGE_KEY) || '';
+    return stored.trim().replace(/\/$/, '');
+  }
+  return '';
+}
+
+export function setCustomApiBaseUrl(url: string): void {
+  if (typeof window === 'undefined') return;
+  const cleaned = url.trim().replace(/\/$/, '');
+  if (!cleaned) {
+    window.localStorage.removeItem(API_BASE_STORAGE_KEY);
+  } else {
+    window.localStorage.setItem(API_BASE_STORAGE_KEY, cleaned);
+  }
+}
+
+export async function checkBackendHealth(overrideUrl?: string): Promise<{
+  ok: boolean;
+  message: string;
+}> {
+  const base = (overrideUrl !== undefined ? overrideUrl : getApiBaseUrl()).replace(/\/$/, '');
+  try {
+    const res = await fetch(`${base}/api/health`);
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.includes('application/json')) {
+      return {
+        ok: false,
+        message: 'Static host detected or /api/health unavailable. Set your Cloud Run backend URL to enable live AI.',
+      };
+    }
+    const json = await res.json();
+    return {
+      ok: json.status === 'ok',
+      message: json.apiKeyConfigured
+        ? 'Connected to live Gemini AI backend.'
+        : 'Backend reachable, but GEMINI_API_KEY is not configured on the server.',
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      message: err?.message || 'Unable to reach backend server.',
+    };
+  }
+}
 
 function buildUrl(endpoint: string): string {
   if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
     return endpoint;
   }
-  return `${API_BASE}${endpoint}`;
+  return `${getApiBaseUrl()}${endpoint}`;
 }
 
 export async function fetchQuotaStatus(): Promise<{
@@ -19,7 +68,8 @@ export async function fetchQuotaStatus(): Promise<{
 } | null> {
   try {
     const res = await fetch(buildUrl('/api/quota'));
-    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.includes('application/json')) return null;
     const data = await res.json();
     return {
       tier: data.tier === 'premium' ? 'premium' : 'free',
