@@ -1,29 +1,70 @@
-import React, { useState } from 'react';
-import { AppProvider, useApp, AppModuleView } from './context/AppContext';
+import React, { useState, Suspense, lazy } from 'react';
+import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { CurriculumModal } from './components/CurriculumModal';
 import { UpgradeModal } from './components/UpgradeModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Modules
-import { DashboardModule } from './components/modules/DashboardModule';
-import { AITutorModule } from './components/modules/AITutorModule';
-import { ExamPracticeModule } from './components/modules/ExamPracticeModule';
-import { PastPapersModule } from './components/modules/PastPapersModule';
-import { HomeworkScannerModule } from './components/modules/HomeworkScannerModule';
-import { VoiceTutorModule } from './components/modules/VoiceTutorModule';
-import { WeaknessDetectorModule } from './components/modules/WeaknessDetectorModule';
-import { FlashcardsModule } from './components/modules/FlashcardsModule';
-import { StudyPlannerModule } from './components/modules/StudyPlannerModule';
-import { ChallengeModeModule } from './components/modules/ChallengeModeModule';
-import { NotesSummarizerModule } from './components/modules/NotesSummarizerModule';
-import { ProgressReportsModule } from './components/modules/ProgressReportsModule';
-import { ExamCountdownModule } from './components/modules/ExamCountdownModule';
-import { OfflineRevisionModule } from './components/modules/OfflineRevisionModule';
-import { SettingsModule } from './components/modules/SettingsModule';
+// Lazy-loaded modules for faster mobile initial load and smaller chunks
+const DashboardModule = lazy(() =>
+  import('./components/modules/DashboardModule').then((m) => ({ default: m.DashboardModule }))
+);
+const AITutorModule = lazy(() =>
+  import('./components/modules/AITutorModule').then((m) => ({ default: m.AITutorModule }))
+);
+const ExamPracticeModule = lazy(() =>
+  import('./components/modules/ExamPracticeModule').then((m) => ({ default: m.ExamPracticeModule }))
+);
+const PastPapersModule = lazy(() =>
+  import('./components/modules/PastPapersModule').then((m) => ({ default: m.PastPapersModule }))
+);
+const HomeworkScannerModule = lazy(() =>
+  import('./components/modules/HomeworkScannerModule').then((m) => ({ default: m.HomeworkScannerModule }))
+);
+const VoiceTutorModule = lazy(() =>
+  import('./components/modules/VoiceTutorModule').then((m) => ({ default: m.VoiceTutorModule }))
+);
+const WeaknessDetectorModule = lazy(() =>
+  import('./components/modules/WeaknessDetectorModule').then((m) => ({ default: m.WeaknessDetectorModule }))
+);
+const FlashcardsModule = lazy(() =>
+  import('./components/modules/FlashcardsModule').then((m) => ({ default: m.FlashcardsModule }))
+);
+const StudyPlannerModule = lazy(() =>
+  import('./components/modules/StudyPlannerModule').then((m) => ({ default: m.StudyPlannerModule }))
+);
+const ChallengeModeModule = lazy(() =>
+  import('./components/modules/ChallengeModeModule').then((m) => ({ default: m.ChallengeModeModule }))
+);
+const NotesSummarizerModule = lazy(() =>
+  import('./components/modules/NotesSummarizerModule').then((m) => ({ default: m.NotesSummarizerModule }))
+);
+const ProgressReportsModule = lazy(() =>
+  import('./components/modules/ProgressReportsModule').then((m) => ({ default: m.ProgressReportsModule }))
+);
+const ExamCountdownModule = lazy(() =>
+  import('./components/modules/ExamCountdownModule').then((m) => ({ default: m.ExamCountdownModule }))
+);
+const OfflineRevisionModule = lazy(() =>
+  import('./components/modules/OfflineRevisionModule').then((m) => ({ default: m.OfflineRevisionModule }))
+);
+const SettingsModule = lazy(() =>
+  import('./components/modules/SettingsModule').then((m) => ({ default: m.SettingsModule }))
+);
+
+const ModuleLoader: React.FC = () => (
+  <div className="min-h-[300px] flex items-center justify-center">
+    <div className="flex items-center gap-3 text-xs text-slate-400">
+      <div className="w-5 h-5 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+      <span>Loading study module...</span>
+    </div>
+  </div>
+);
 
 const MainContent: React.FC = () => {
-  const { activeModule, searchQuery, setActiveModule, setSubject, setTopic } = useApp();
+  const { activeModule } = useApp();
 
   const [curriculumModalOpen, setCurriculumModalOpen] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
@@ -87,17 +128,24 @@ const MainContent: React.FC = () => {
       />
 
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
-        {/* Sidebar */}
+        {/* Sidebar (desktop fixed, mobile slide-over drawer) */}
         <Sidebar
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
         />
 
-        {/* Main Content Pane */}
-        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          {renderActiveModule()}
+        {/* Main Content Pane with safe mobile bottom nav spacing */}
+        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 pb-24 lg:pb-8 overflow-y-auto">
+          <ErrorBoundary>
+            <Suspense fallback={<ModuleLoader />}>
+              {renderActiveModule()}
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav onOpenMenu={() => setMobileMenuOpen((prev) => !prev)} />
 
       {/* Global Modals */}
       <CurriculumModal
@@ -115,8 +163,10 @@ const MainContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <MainContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

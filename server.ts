@@ -12,6 +12,30 @@ const __dirname = path.dirname(__filename);
 export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Security & CORS configuration for full-stack and static GitHub Pages deployments
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use((req: Request, res: Response, next: () => void) => {
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes('*') || allowedOrigins.includes(origin))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Expose-Headers', 'X-Quota-Tier, X-Quota-Remaining, X-Quota-Limit');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
 // Body parser limits for image uploads (Homework Scanner)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -28,9 +52,8 @@ const ai = new GoogleGenAI({
 
 /**
  * Resilient Gemini Call with Automatic Retry and Model Failover.
- * If gemini-3.8-flash returns 503 (high demand / unavailable) or 429,
- * it retries with backoff and falls back immediately to gemini-3.1-flash-lite,
- * ensuring high availability and zero student disruption during API traffic spikes.
+ * Uses the active free-tier model chain ('gemini-4-hydrogen' -> 'gemini-3.1-flash-lite' -> 'gemini-flash-latest')
+ * with automatic retry/failover on 503/429 demand spikes.
  */
 async function callGeminiSafe(params: {
   contents: any;
@@ -38,7 +61,7 @@ async function callGeminiSafe(params: {
   preferredModel?: string;
 }): Promise<any> {
   const models = [
-    params.preferredModel || 'gemini-3.8-flash',
+    params.preferredModel || 'gemini-4-hydrogen',
     'gemini-3.1-flash-lite',
     'gemini-flash-latest',
   ];
@@ -97,32 +120,40 @@ interface QuotaRecord {
 const ipQuotas = new Map<string, QuotaRecord>();
 const FREE_DAILY_LIMIT = 50; // Generous free tier limit
 
-function checkQuota(req: Request, res: Response, next: () => void) {
-  const isPremium = req.headers['x-spark-tier'] === 'premium';
-  if (isPremium) {
-    res.setHeader('X-Quota-Tier', 'premium');
-    res.setHeader('X-Quota-Remaining', 'unlimited');
-    return next();
+function getClientKey(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
   }
+  return req.socket.remoteAddress || 'local';
+}
 
-  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'local';
+function getOrResetQuota(clientKey: string): QuotaRecord {
   const now = Date.now();
-  let record = ipQuotas.get(clientIp);
-
+  let record = ipQuotas.get(clientKey);
   if (!record || now > record.resetTime) {
     record = {
       count: 0,
       resetTime: now + 24 * 60 * 60 * 1000,
     };
-    ipQuotas.set(clientIp, record);
+    ipQuotas.set(clientKey, record);
   }
+  return record;
+}
+
+// Server-enforced freemium quota (cannot be bypassed by client headers or frontend state)
+function checkQuota(req: Request, res: Response, next: () => void) {
+  const clientIp = getClientKey(req);
+  const now = Date.now();
+  const record = getOrResetQuota(clientIp);
 
   if (record.count >= FREE_DAILY_LIMIT) {
     const hoursLeft = Math.ceil((record.resetTime - now) / (1000 * 60 * 60));
     res.setHeader('X-Quota-Tier', 'free');
     res.setHeader('X-Quota-Remaining', '0');
+    res.setHeader('X-Quota-Limit', FREE_DAILY_LIMIT.toString());
     return res.status(429).json({
-      error: `Daily free AI quota reached (${FREE_DAILY_LIMIT}/${FREE_DAILY_LIMIT} requests). You can switch to ScholarSpark Premium mode to continue without restrictions.`,
+      error: `Daily free AI quota reached (${FREE_DAILY_LIMIT}/${FREE_DAILY_LIMIT} requests). Your free daily allowance resets in ${hoursLeft} hour(s).`,
       quotaExceeded: true,
       hoursLeft,
     });
@@ -160,8 +191,20 @@ app.get('/api/health', (_req: Request, res: Response) => {
     service: 'ScholarSpark AI Resilient Full-Stack Service',
     time: new Date().toISOString(),
     apiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
-    models: ['gemini-3.8-flash (Primary)', 'gemini-3.1-flash-lite (Failover)', 'gemini-flash-latest (Failover)'],
+    models: ['gemini-4-hydrogen (Primary)', 'gemini-3.1-flash-lite (Failover)', 'gemini-flash-latest (Failover)'],
     curriculumsSupported: ['ECZ (Examinations Council of Zambia)', 'Cambridge IGCSE'],
+  });
+});
+
+app.get('/api/quota', (req: Request, res: Response) => {
+  const clientIp = getClientKey(req);
+  const record = getOrResetQuota(clientIp);
+  const remaining = Math.max(0, FREE_DAILY_LIMIT - record.count);
+  res.json({
+    tier: 'free',
+    remaining,
+    limit: FREE_DAILY_LIMIT,
+    resetTime: new Date(record.resetTime).toISOString(),
   });
 });
 
@@ -241,7 +284,6 @@ RULES:
       contents: conversationContents,
       config: {
         systemInstruction,
-        temperature: 0.7,
       },
     });
 

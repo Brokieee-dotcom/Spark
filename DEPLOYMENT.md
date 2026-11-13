@@ -6,7 +6,7 @@ ScholarSpark AI is a full-stack educational web application built for students s
 1. **ECZ (Examinations Council of Zambia)**: Grades 7, 9, 12, and GCE.
 2. **Cambridge Assessment International Education**: IGCSE (Core & Extended), O-Level, and AS/A-Level.
 
-The application combines a high-performance **Vite + React 19** frontend with an **Express Node.js** backend running `@google/genai` (Gemini 3.8 Flash model) for server-side pedagogical reasoning, structured question marking, multimodal homework OCR, and spaced repetition flashcard generation.
+The application combines a high-performance **Vite + React 19** frontend with an **Express Node.js** backend running `@google/genai` (`gemini-4-hydrogen` with `gemini-3.1-flash-lite` failover) for server-side pedagogical reasoning, structured question marking, multimodal homework OCR, and spaced repetition flashcard generation.
 
 ---
 
@@ -41,7 +41,24 @@ In your GitHub repository under **Settings > Branches > Add branch protection ru
 
 ---
 
-## 4. Google Cloud Run Deployment
+## 4. GitHub Pages Deployment (Static Frontend)
+
+ScholarSpark AI supports GitHub Pages out of the box via:
+- Relative asset paths & configurable base (`VITE_BASE_PATH`, defaulting to `./`).
+- Hash-based module routing (`#dashboard`, `#tutor`, `#practice`, etc.) so browser refreshes and direct links never 404 on GitHub Pages.
+- Optional remote API routing via `VITE_API_BASE_URL` (because GitHub Pages hosts static files only and cannot execute Express or store `GEMINI_API_KEY`).
+
+### Steps to Enable GitHub Pages
+1. In your GitHub repository, open **Settings > Pages** and set **Build and deployment > Source** to **GitHub Actions**.
+2. Open **Settings > Secrets and variables > Actions > Variables** and add:
+   - `ENABLE_GITHUB_PAGES` = `true`
+   - `VITE_API_BASE_URL` = `https://your-cloud-run-service-url.run.app` (required for live AI features from GitHub Pages; offline modules like Flashcards, Study Planner, Exam Countdown, and Local Notes work without a backend).
+   - `ALLOWED_ORIGINS` = `https://YOUR_GITHUB_USERNAME.github.io` (set on your Cloud Run backend so browser CORS requests from GitHub Pages are allowed).
+3. Push to `main` (or trigger **Actions > Build, Test, and Deploy ScholarSpark AI > Run workflow**).
+
+---
+
+## 5. Google Cloud Run Deployment (Full-Stack & AI Backend)
 
 ### Option A: Automated via GitHub Actions (Recommended)
 

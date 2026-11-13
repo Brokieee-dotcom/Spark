@@ -39,7 +39,7 @@ ScholarSpark AI is an independent educational revision technology platform. **It
 
 5. **AI Homework Scanner**:
    - Upload question image or capture directly with device camera.
-   - Multimodal OCR powered by server-side Gemini 3.8 Flash.
+   - Multimodal OCR powered by server-side Gemini (`gemini-4-hydrogen` with `gemini-3.1-flash-lite` failover).
    - Editable OCR question text box allowing students to correct misread numbers.
    - Formulates step-by-step working, final answers with SI units, and common pitfalls.
    - Ephemeral processing with zero long-term retention of images.
@@ -84,18 +84,18 @@ ScholarSpark AI is an independent educational revision technology platform. **It
     - Clear indicator showing online vs offline modes.
 
 15. **Freemium Quota & Plan Management**:
-    - Server-enforced daily rate limits (25 AI questions/day on Free tier).
-    - Transparent plan toggling for preview testing without fake payment flows.
+    - Server-enforced daily rate limits (50 AI requests/day on Free tier, verified via `/api/quota` and `X-Quota-*` response headers).
+    - Strict server-side enforcement without client-side premium spoofing bypasses.
 
 ---
 
 ## Technical Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Lucide React, Motion.
-- **Backend**: Express Node.js, `@google/genai` (Gemini 3.8 Flash), tsx.
-- **Build Tool**: Vite.
+- **Backend**: Express Node.js, `@google/genai` (resilient failover across `gemini-3.8-flash`, `gemini-3.1-flash-lite`, `gemini-flash-latest`), tsx.
+- **Build Tool**: Vite (configured with relative `./` base path and hash routing for GitHub Pages + Cloud Run compatibility).
 - **Port**: 3000.
-- **Deployment**: Google Cloud Run, Docker multi-stage container, GitHub Actions CI/CD.
+- **Deployment**: GitHub Pages (static frontend) + Google Cloud Run (full-stack / AI API backend), Docker multi-stage container, GitHub Actions CI/CD.
 
 ---
 

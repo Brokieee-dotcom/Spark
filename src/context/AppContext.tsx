@@ -12,6 +12,7 @@ import {
   StudentProfile,
 } from '../types';
 import { CURRICULA_DATA, STARTER_FLASHCARD_DECKS, DEFAULT_EXAM_DATES } from '../data/curriculums';
+import { fetchQuotaStatus } from '../services/api';
 
 export type AppModuleView =
   | 'dashboard'
@@ -70,6 +71,7 @@ interface AppContextType {
   // Study Planner
   tasks: StudyTask[];
   addTask: (task: Omit<StudyTask, 'id'>) => void;
+  updateTask: (taskId: string, updates: Partial<Omit<StudyTask, 'id'>>) => void;
   toggleTaskCompleted: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
   setAllTasks: (tasks: StudyTask[]) => void;
@@ -99,8 +101,32 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'scholarspark_state_v1';
 
+const VALID_MODULES: AppModuleView[] = [
+  'dashboard',
+  'tutor',
+  'practice',
+  'pastpapers',
+  'scanner',
+  'voice',
+  'flashcards',
+  'weakness',
+  'planner',
+  'challenge',
+  'notes',
+  'reports',
+  'countdown',
+  'offline',
+  'settings',
+];
+
+function getInitialModuleFromHash(): AppModuleView {
+  if (typeof window === 'undefined') return 'dashboard';
+  const raw = window.location.hash.replace(/^#\/?/, '') as AppModuleView;
+  return VALID_MODULES.includes(raw) ? raw : 'dashboard';
+}
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activeModule, setActiveModule] = useState<AppModuleView>('dashboard');
+  const [activeModule, setActiveModuleState] = useState<AppModuleView>(getInitialModuleFromHash);
   const [curriculum, setCurriculumState] = useState<CurriculumType>('ECZ');
   const [grade, setGrade] = useState<string>('Grade 12');
   const [subject, setSubject] = useState<string>('Mathematics');
@@ -121,8 +147,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     isGuest: false,
   });
 
-  const [quotaRemaining, setQuotaRemaining] = useState<number>(25);
-  const [quotaLimit] = useState<number>(25);
+  const [quotaRemaining, setQuotaRemaining] = useState<number>(50);
+  const [quotaLimit, setQuotaLimit] = useState<number>(50);
 
   const [quizAttempts, setQuizAttempts] = useState<QuizAttempt[]>([]);
   const [flashcardDecks, setFlashcardDecks] = useState<FlashcardDeck[]>(STARTER_FLASHCARD_DECKS);
@@ -164,14 +190,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [examDates, setExamDates] = useState<ExamCountdownItem[]>(DEFAULT_EXAM_DATES);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
-  // Load from LocalStorage on initial mount
+  const setActiveModule = (mod: AppModuleView) => {
+    setActiveModuleState(mod);
+    if (typeof window !== 'undefined') {
+      const targetHash = `#${mod}`;
+      if (window.location.hash !== targetHash) {
+        window.history.pushState(null, '', targetHash);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Load from LocalStorage, sync hash navigation & server quota on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.profile) setProfile(parsed.profile);
-        if (parsed.curriculum) setCurriculumState(parsed.curriculum);
+        if (parsed.profile) {
+          setProfile({ ...parsed.profile, planTier: 'free' });
+        }
+        if (parsed.curriculum && CURRICULA_DATA[parsed.curriculum as CurriculumType]) {
+          setCurriculumState(parsed.curriculum);
+        }
         if (parsed.grade) setGrade(parsed.grade);
         if (parsed.subject) setSubject(parsed.subject);
         if (parsed.topic) setTopic(parsed.topic);
@@ -186,12 +227,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.warn('Could not read from localStorage:', e);
     }
 
+    fetchQuotaStatus().then((status) => {
+      if (status) {
+        setQuotaRemaining(status.remaining);
+        setQuotaLimit(status.limit);
+      }
+    });
+
+    const handleHashChange = () => {
+      setActiveModuleState(getInitialModuleFromHash());
+    };
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -230,18 +284,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateProfile = (updates: Partial<StudentProfile>) => {
-    setProfile((prev) => ({ ...prev, ...updates }));
+    setProfile((prev) => ({ ...prev, ...updates, planTier: 'free' }));
   };
 
   const togglePremiumMode = () => {
+    // Subscription status is server-enforced; frontend never unlocks paid tiers
     setProfile((prev) => ({
       ...prev,
-      planTier: prev.planTier === 'free' ? 'premium' : 'free',
+      planTier: 'free',
     }));
   };
 
-  const setQuotaInfo = (rem: number, _limit: number) => {
+  const setQuotaInfo = (rem: number, limit: number) => {
     setQuotaRemaining(rem);
+    if (limit > 0) setQuotaLimit(limit);
   };
 
   const recordQuizAttempt = (attempt: Omit<QuizAttempt, 'id' | 'date'>) => {
@@ -335,6 +391,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addTask = (task: Omit<StudyTask, 'id'>) => {
     const newTask: StudyTask = { ...task, id: 'task-' + Date.now() };
     setTasks((prev) => [newTask, ...prev]);
+  };
+
+  const updateTask = (taskId: string, updates: Partial<Omit<StudyTask, 'id'>>) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
+    );
   };
 
   const toggleTaskCompleted = (taskId: string) => {
@@ -447,6 +509,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateCardStatus,
         tasks,
         addTask,
+        updateTask,
         toggleTaskCompleted,
         deleteTask,
         setAllTasks,

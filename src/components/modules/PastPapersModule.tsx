@@ -31,10 +31,10 @@ interface PastPaperItem {
 }
 
 export const PastPapersModule: React.FC = () => {
-  const { curriculum, subject, setSubject, setTopic, setActiveModule } = useApp();
+  const { curriculum, setSubject, setTopic, setActiveModule } = useApp();
 
   const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
-  const [paperFilter, setPaperFilter] = useState<string>('all');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [searchFilter, setSearchFilter] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
@@ -148,10 +148,26 @@ export const PastPapersModule: React.FC = () => {
     },
   ];
 
+  const curriculumSubjects = Array.from(
+    new Set(
+      pastPapersList
+        .filter((p) => p.curriculum === curriculum)
+        .map((p) => p.subject)
+    )
+  );
+
   const filteredPapers = pastPapersList.filter((p) => {
     if (p.curriculum !== curriculum) return false;
     if (selectedYear !== 'all' && p.year !== selectedYear) return false;
-    if (searchFilter && !p.paperName.toLowerCase().includes(searchFilter.toLowerCase())) return false;
+    if (selectedSubjectFilter !== 'all' && p.subject !== selectedSubjectFilter) return false;
+    if (
+      searchFilter &&
+      !p.paperName.toLowerCase().includes(searchFilter.toLowerCase()) &&
+      !p.paperCode.toLowerCase().includes(searchFilter.toLowerCase()) &&
+      !p.topicsCovered.some((t) => t.toLowerCase().includes(searchFilter.toLowerCase()))
+    ) {
+      return false;
+    }
     return true;
   });
 
@@ -246,6 +262,20 @@ export const PastPapersModule: React.FC = () => {
               {yr === 'all' ? 'All Years' : yr}
             </button>
           ))}
+
+          <select
+            value={selectedSubjectFilter}
+            onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+            aria-label="Filter by subject"
+            className="ml-0 sm:ml-2 px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-teal-400"
+          >
+            <option value="all">All Subjects</option>
+            {curriculumSubjects.map((sub) => (
+              <option key={sub} value={sub}>
+                {sub}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Search */}
@@ -255,13 +285,31 @@ export const PastPapersModule: React.FC = () => {
             type="text"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Filter by paper name..."
+            placeholder="Filter by paper, code or topic..."
             className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400"
           />
         </div>
       </div>
 
       {/* Past Papers Cards */}
+      {filteredPapers.length === 0 ? (
+        <div className="p-8 rounded-2xl bg-[#0F1E36] border border-slate-800 text-center space-y-3">
+          <p className="text-sm font-semibold text-white">No matching blueprint papers found</p>
+          <p className="text-xs text-slate-400">
+            Try clearing your filters or upload your own paper image above to solve it step by step.
+          </p>
+          <button
+            onClick={() => {
+              setSelectedYear('all');
+              setSelectedSubjectFilter('all');
+              setSearchFilter('');
+            }}
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold"
+          >
+            Reset Filters
+          </button>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredPapers.map((paper) => (
           <div
@@ -337,6 +385,7 @@ export const PastPapersModule: React.FC = () => {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 };

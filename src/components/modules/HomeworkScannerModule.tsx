@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { requestApi } from '../../services/api';
 import {
@@ -33,7 +33,7 @@ interface HomeworkScanResult {
 }
 
 export const HomeworkScannerModule: React.FC = () => {
-  const { curriculum, subject, topic, profile, saveNote } = useApp();
+  const { curriculum, subject, topic, profile, saveNote, setQuotaInfo } = useApp();
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>('image/jpeg');
@@ -50,6 +50,23 @@ export const HomeworkScannerModule: React.FC = () => {
   const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [cameraActive]);
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -81,15 +98,16 @@ export const HomeworkScannerModule: React.FC = () => {
 
   const startCamera = async () => {
     setError(null);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError('Camera access is not supported in this browser. Please use Browse Files.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
+      streamRef.current = stream;
       setCameraActive(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
     } catch (err: any) {
       console.error('Camera error:', err);
       setError('Camera permission denied or camera not supported on this device. Please use the file upload option.');
@@ -114,9 +132,11 @@ export const HomeworkScannerModule: React.FC = () => {
   };
 
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setCameraActive(false);
@@ -139,6 +159,10 @@ export const HomeworkScannerModule: React.FC = () => {
         },
         { isPremium: profile.planTier === 'premium' }
       );
+
+      if (res.quotaRemaining !== undefined) {
+        setQuotaInfo(res.quotaRemaining, res.quotaLimit ?? 50);
+      }
 
       setScanResult(res.data.result);
       setEditableQuestion(res.data.result.extractedQuestion || '');

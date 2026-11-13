@@ -19,11 +19,10 @@ export const SettingsModule: React.FC = () => {
     updateProfile,
     curriculum,
     setCurriculum,
-    togglePremiumMode,
-    clearAllLocalData,
     exportDataJson,
     importDataJson,
     quotaRemaining,
+    quotaLimit,
   } = useApp();
 
   const [name, setName] = useState(profile.name);
@@ -205,20 +204,14 @@ export const SettingsModule: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Daily Free AI Queries Left:</span>
                 <span className="font-mono font-bold text-white">
-                  {profile.planTier === 'premium' ? 'Unlimited' : `${quotaRemaining} / 25`}
+                  {quotaRemaining} / {quotaLimit}
                 </span>
               </div>
             </div>
 
-            <button
-              onClick={togglePremiumMode}
-              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-teal-300 transition-colors flex items-center justify-center gap-2"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>
-                Toggle Plan Mode ({profile.planTier === 'premium' ? 'Switch to Free' : 'Test Premium'})
-              </span>
-            </button>
+            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+              Daily usage limits are enforced server-side. ScholarSpark Pro upgrades require verified billing setup.
+            </div>
           </div>
 
           {/* Backup & Data Export */}

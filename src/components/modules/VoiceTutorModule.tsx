@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const VoiceTutorModule: React.FC = () => {
-  const { curriculum, grade, subject, topic, difficulty, simpleLanguageMode, localLanguage, profile } = useApp();
+  const { curriculum, grade, subject, topic, difficulty, simpleLanguageMode, localLanguage, profile, setQuotaInfo } = useApp();
 
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -34,6 +34,19 @@ export const VoiceTutorModule: React.FC = () => {
   const isSpeechSupported =
     typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const startVoiceInput = () => {
     setError(null);
@@ -118,6 +131,10 @@ export const VoiceTutorModule: React.FC = () => {
         },
         { isPremium: profile.planTier === 'premium' }
       );
+
+      if (res.quotaRemaining !== undefined) {
+        setQuotaInfo(res.quotaRemaining, res.quotaLimit ?? 50);
+      }
 
       setResponseAudioText(res.data.reply);
       // Automatically speak response

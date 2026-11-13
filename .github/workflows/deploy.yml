@@ -1,4 +1,4 @@
-name: Build, Test, and Deploy ScholarSpark AI to Google Cloud Run
+name: Build, Test, and Deploy ScholarSpark AI
 
 on:
   push:
@@ -8,6 +8,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Optional deployment target override (auto, pages, cloud-run, all)'
+        required: false
+        default: 'auto'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -51,10 +56,62 @@ jobs:
           kill $SERVER_PID || true
           echo "Production build and server health check verified successfully."
 
-  deploy-cloud-run:
-    name: Deploy to Google Cloud Run
+  deploy-github-pages:
+    name: Deploy Frontend to GitHub Pages
     needs: validate-and-build
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (vars.ENABLE_GITHUB_PAGES == 'true' || github.event.inputs.deploy_target == 'pages' || github.event.inputs.deploy_target == 'all')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Locked Dependencies
+        run: npm ci
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build Static Site for Repository Subpath
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || '' }}
+        run: npm run build
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  deploy-cloud-run:
+    name: Deploy Full-Stack Service to Google Cloud Run
+    needs: validate-and-build
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.event.inputs.deploy_target != 'pages'
     runs-on: ubuntu-latest
 
     permissions:
@@ -105,6 +162,7 @@ jobs:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE_NAME || 'scholarspark-ai' }}
           REGION: ${{ secrets.GCP_REGION || 'europe-west3' }}
+          ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS || '' }}
         run: |
           SERVICE_URL=$(gcloud run deploy "$SERVICE_NAME" \
             --source . \
@@ -112,7 +170,7 @@ jobs:
             --region "$REGION" \
             --project "$GCP_PROJECT_ID" \
             --allow-unauthenticated \
-            --set-env-vars="NODE_ENV=production" \
+            --set-env-vars="NODE_ENV=production,ALLOWED_ORIGINS=${ALLOWED_ORIGINS}" \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" \
             --port 3000 \
             --format='value(status.url)')

@@ -34,14 +34,27 @@ test('GET /api/health returns service status without leaking secrets', async () 
   assert.equal('GEMINI_API_KEY' in body, false);
 });
 
-test('POST /api/tutor validates missing message and sets free quota headers', async () => {
+test('GET /api/quota returns server-enforced free tier allowance', async () => {
+  const res = await fetch(`${baseUrl}/api/quota`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.tier, 'free');
+  assert.equal(body.limit, 50);
+  assert.equal(typeof body.remaining, 'number');
+});
+
+test('POST /api/tutor validates missing message and ignores client premium spoofing headers', async () => {
   const res = await fetch(`${baseUrl}/api/tutor`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Spark-Tier': 'premium',
+    },
     body: JSON.stringify({ curriculum: 'ECZ', subject: 'Mathematics' }),
   });
   assert.equal(res.status, 400);
   assert.equal(res.headers.get('x-quota-tier'), 'free');
+  assert.equal(res.headers.get('x-quota-limit'), '50');
   const body = await res.json();
   assert.match(body.error, /question or message is required/i);
 });

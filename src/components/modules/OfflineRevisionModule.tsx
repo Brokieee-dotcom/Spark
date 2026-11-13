@@ -18,14 +18,15 @@ export const OfflineRevisionModule: React.FC = () => {
   const { isOnline, flashcardDecks, savedNotes, clearAllLocalData, setActiveModule } = useApp();
 
   const [clearSuccess, setClearSuccess] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   // Estimate storage usage
   const estimateStorageKB = () => {
     try {
       let total = 0;
       for (const key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-          total += (localStorage[key].length * 2);
+        if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
+          total += localStorage[key].length * 2;
         }
       }
       return Math.round(total / 1024);
@@ -34,12 +35,11 @@ export const OfflineRevisionModule: React.FC = () => {
     }
   };
 
-  const handleClearCache = () => {
-    if (window.confirm('Clear all offline cached decks, notes, and quiz history?')) {
-      clearAllLocalData();
-      setClearSuccess(true);
-      setTimeout(() => setClearSuccess(false), 3000);
-    }
+  const handleConfirmClearCache = () => {
+    clearAllLocalData();
+    setConfirmClear(false);
+    setClearSuccess(true);
+    setTimeout(() => setClearSuccess(false), 3000);
   };
 
   return (
@@ -156,7 +156,7 @@ export const OfflineRevisionModule: React.FC = () => {
       </div>
 
       {/* Storage Management */}
-      <div className="p-5 rounded-2xl bg-[#0F1E36] border border-slate-800 flex items-center justify-between">
+      <div className="p-5 rounded-2xl bg-[#0F1E36] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h4 className="font-bold text-sm text-white">Clear Offline Storage</h4>
           <p className="text-xs text-slate-400 mt-0.5">
@@ -164,13 +164,30 @@ export const OfflineRevisionModule: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleClearCache}
-          className="px-4 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-950 text-rose-300 border border-rose-900 text-xs font-semibold transition-colors flex items-center gap-1.5"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span>{clearSuccess ? 'Cache Cleared!' : 'Clear Cache'}</span>
-        </button>
+        {confirmClear ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleConfirmClearCache}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors"
+            >
+              Confirm Clear All
+            </button>
+            <button
+              onClick={() => setConfirmClear(false)}
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmClear(true)}
+            className="px-4 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-950 text-rose-300 border border-rose-900 text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>{clearSuccess ? 'Cache Cleared!' : 'Clear Cache'}</span>
+          </button>
+        )}
       </div>
     </div>
   );

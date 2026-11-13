@@ -22,7 +22,7 @@ interface SummaryData {
 }
 
 export const NotesSummarizerModule: React.FC = () => {
-  const { curriculum, subject, topic, profile, saveNote } = useApp();
+  const { curriculum, subject, topic, profile, saveNote, setQuotaInfo } = useApp();
 
   const [notesText, setNotesText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -66,6 +66,10 @@ export const NotesSummarizerModule: React.FC = () => {
         },
         { isPremium: profile.planTier === 'premium' }
       );
+
+      if (res.quotaRemaining !== undefined) {
+        setQuotaInfo(res.quotaRemaining, res.quotaLimit ?? 50);
+      }
 
       setSummaryData(res.data.summary);
       setRevealedAnswers({});
@@ -191,14 +195,14 @@ export const NotesSummarizerModule: React.FC = () => {
           {summaryData ? (
             <div className="p-6 rounded-2xl bg-[#0F1E36] border border-slate-800 space-y-6 shadow-xl">
               {/* Actions Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-teal-400">
                     High-Yield Synthesis
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleCopySummary}
                     className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition-colors"
