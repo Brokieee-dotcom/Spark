@@ -34,19 +34,27 @@ jobs:
       - name: Run Type Checking & Linter
         run: npm run lint
 
+      - name: Run Automated Tests
+        run: npm test
+
       - name: Run Production Frontend Build
         run: npm run build
 
-      - name: Verify Build Artifacts
+      - name: Verify Build Artifacts & Production Server Boot
         run: |
           test -d dist || { echo "Build artifact 'dist/' missing!"; exit 1; }
           test -f dist/index.html || { echo "Entry point 'dist/index.html' missing!"; exit 1; }
-          echo "Production frontend build verified successfully."
+          NODE_ENV=production PORT=3001 npm run start &
+          SERVER_PID=$!
+          sleep 3
+          curl -fsS http://127.0.0.1:3001/api/health
+          kill $SERVER_PID || true
+          echo "Production build and server health check verified successfully."
 
   deploy-cloud-run:
     name: Deploy to Google Cloud Run
     needs: validate-and-build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
     permissions:
@@ -54,46 +62,59 @@ jobs:
       id-token: 'write' # Required for Workload Identity Federation
 
     steps:
+      - name: Check Cloud Run Secrets Configuration
+        id: config
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "$GCP_PROJECT_ID" ] || { [ -z "$GCP_WIF_PROVIDER" ] && [ -z "$GCP_SA_KEY" ]; }; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Cloud Run deployment skipped because GCP_PROJECT_ID and authentication secrets (GCP_WORKLOAD_IDENTITY_PROVIDER + GCP_SERVICE_ACCOUNT) are not configured in GitHub Repository Secrets. See DEPLOYMENT.md for setup steps."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout Source Code
+        if: steps.config.outputs.configured == 'true'
         uses: actions/checkout@v4
 
       # Workload Identity Federation (Recommended: Zero Long-Lived Keys in GitHub)
       - name: Authenticate to Google Cloud via WIF
-        id: auth
+        if: steps.config.outputs.configured == 'true' && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
         uses: google-github-actions/auth@v2
-        continue-on-error: true
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       # Fallback to Service Account Key if WIF is not configured
       - name: Fallback Authentication via Service Account Key
-        if: steps.auth.outcome == 'failure' && secrets.GCP_SA_KEY != ''
+        if: steps.config.outputs.configured == 'true' && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER == '' && secrets.GCP_SA_KEY != ''
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Google Cloud SDK
+        if: steps.config.outputs.configured == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Authorize Docker to Artifact Registry
-        run: |
-          if [ -n "${{ secrets.GCP_REGION }}" ]; then
-            gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
-          fi
-
       - name: Build and Deploy to Cloud Run
-        if: env.GCP_PROJECT_ID != ''
+        if: steps.config.outputs.configured == 'true'
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE_NAME || 'scholarspark-ai' }}
           REGION: ${{ secrets.GCP_REGION || 'europe-west3' }}
         run: |
-          gcloud run deploy "$SERVICE_NAME" \
+          SERVICE_URL=$(gcloud run deploy "$SERVICE_NAME" \
             --source . \
             --platform managed \
             --region "$REGION" \
             --project "$GCP_PROJECT_ID" \
             --allow-unauthenticated \
+            --set-env-vars="NODE_ENV=production" \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" \
-            --port 3000
+            --port 3000 \
+            --format='value(status.url)')
+          echo "Deployed URL: $SERVICE_URL"
+          curl -fsS "${SERVICE_URL}/api/health"

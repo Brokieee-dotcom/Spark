@@ -9,7 +9,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
+export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 // Body parser limits for image uploads (Homework Scanner)
@@ -136,7 +136,7 @@ function checkQuota(req: Request, res: Response, next: () => void) {
   next();
 }
 
-function parseSafeJson<T>(raw: string, fallback: T): T {
+export function parseSafeJson<T>(raw: string, fallback: T): T {
   try {
     let cleaned = raw.trim();
     if (cleaned.startsWith('```json')) {
@@ -830,7 +830,9 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== 'test') {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}

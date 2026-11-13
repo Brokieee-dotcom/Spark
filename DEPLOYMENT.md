@@ -16,6 +16,7 @@ The application combines a high-performance **Vite + React 19** frontend with an
 |---|---|---|
 | `npm run dev` | Starts full-stack Express server with Vite middleware on port 3000 | Development |
 | `npm run lint` | Runs TypeScript compiler checks without emitting files (`tsc --noEmit`) | CI / Pre-commit |
+| `npm test` | Runs the Node automated test suite (`tests/app.test.ts`) | CI / Pre-commit |
 | `npm run build` | Compiles production assets into `dist/` | Production Build |
 | `npm run start` | Boots the full-stack server serving production static assets from `dist/` | Cloud Run / Production |
 
@@ -25,12 +26,18 @@ The application combines a high-performance **Vite + React 19** frontend with an
 
 To connect this codebase to your GitHub account:
 
-1. In the **Google AI Studio** top right bar, click the **GitHub** or **Export** button.
-2. Select **Connect GitHub Account** and authorize Google AI Studio with repository write permissions.
+1. In the **Google AI Studio** top right bar, click the **Save to GitHub** / **GitHub** icon.
+2. Select **Connect GitHub Account** and authorize Google AI Studio with repository access.
 3. Choose either:
    - **Create a new repository** (e.g. `scholarspark-ai`), or
    - **Link to an existing repository**.
-4. Push your commits directly. AI Studio will synchronize changes.
+4. Confirm the push. AI Studio will commit all source files, `package-lock.json`, `Dockerfile`, `.github/workflows/deploy.yml`, and `tests/`.
+
+### Recommended GitHub Branch Protection (`main`)
+In your GitHub repository under **Settings > Branches > Add branch protection rule** (`main`):
+1. Enable **Require a pull request before merging**.
+2. Enable **Require status checks to pass before merging** and select **`Lint, Test & Production Build`**.
+3. Enable **Do not allow bypassing the above settings**.
 
 ---
 
