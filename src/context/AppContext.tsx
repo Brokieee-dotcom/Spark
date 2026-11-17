@@ -221,7 +221,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (parsed.flashcardDecks && parsed.flashcardDecks.length > 0) setFlashcardDecks(parsed.flashcardDecks);
         if (parsed.tasks) setTasks(parsed.tasks);
         if (parsed.savedNotes) setSavedNotes(parsed.savedNotes);
-        if (parsed.examDates) setExamDates(parsed.examDates);
+        if (Array.isArray(parsed.examDates)) {
+          const existingIds = new Set(parsed.examDates.map((item: ExamCountdownItem) => item.id));
+          const missingAssessments = DEFAULT_EXAM_DATES.filter(
+            (d) => d.assessmentKind === 'term_assessment' && !existingIds.has(d.id)
+          );
+          setExamDates([...parsed.examDates, ...missingAssessments]);
+        }
       }
     } catch (e) {
       console.warn('Could not read from localStorage:', e);

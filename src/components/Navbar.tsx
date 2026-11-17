@@ -114,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const hasResults = searchResults.modules.length > 0 || searchResults.topics.length > 0;
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0B192C] text-white border-b border-slate-800 shadow-md">
+    <header className="sticky top-0 z-40 bg-[#0B192C] text-white border-b border-slate-800">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Mobile menu toggle + Brand */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -130,41 +130,38 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setActiveModule('dashboard')}
             className="flex items-center gap-2 cursor-pointer group min-w-0"
           >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-teal-500/20 group-hover:scale-105 transition-transform shrink-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-teal-500 flex items-center justify-center text-slate-950 font-bold shrink-0">
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950 fill-current" />
             </div>
             <div className="truncate">
               <div className="flex items-center gap-1">
-                <span className="font-extrabold text-sm sm:text-lg tracking-tight text-white group-hover:text-teal-300 transition-colors truncate">
+                <span className="font-bold text-sm sm:text-lg tracking-tight text-white group-hover:text-teal-300 transition-colors truncate">
                   ScholarSpark<span className="text-teal-400">AI</span>
                 </span>
               </div>
-              <p className="text-[10px] text-teal-200/80 -mt-0.5 hidden sm:block tracking-wide">
+              <p className="text-[10px] text-slate-400 -mt-0.5 hidden sm:block">
                 Understand more. Achieve more.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Center: Curriculum Quick Switcher Badge */}
+        {/* Center: Curriculum Quick Switcher */}
         <div className="flex items-center gap-1.5">
           <button
             onClick={onOpenCurriculumModal}
-            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs sm:text-sm font-medium transition-colors text-slate-200"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs sm:text-sm font-medium transition-colors text-slate-200"
             title="Click to switch curriculum, grade, or subject"
           >
             <GraduationCap className="w-4 h-4 text-teal-400 shrink-0" />
             <div className="text-left flex items-center gap-1">
               <span className="font-semibold text-white whitespace-nowrap">
-                {curriculum === 'ECZ' ? 'ECZ' : 'Cambridge'}
+                {curriculum === 'ECZ' ? 'ECZ' : curriculum === 'ZambiaCBC' ? 'Zambia CBC' : 'Cambridge'}
               </span>
               <span className="hidden md:inline text-slate-400 whitespace-nowrap">
                 · {grade} · {subject}
               </span>
             </div>
-            <span className="hidden sm:inline text-[10px] bg-teal-500/20 text-teal-300 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider ml-1">
-              Switch
-            </span>
           </button>
         </div>
 

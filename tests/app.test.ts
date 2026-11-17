@@ -1,8 +1,14 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import JSZip from 'jszip';
 import { app, parseSafeJson } from '../server.ts';
-import { CURRICULA_DATA, SAMPLE_PRACTICE_QUESTIONS } from '../src/data/curriculums.ts';
+import {
+  CURRICULA_DATA,
+  SAMPLE_PRACTICE_QUESTIONS,
+  DEFAULT_EXAM_DATES,
+  ZAMBIAN_PRIVATE_SCHOOLS,
+} from '../src/data/curriculums.ts';
 
 let server: http.Server;
 let baseUrl = '';
@@ -130,13 +136,78 @@ test('parseSafeJson handles fenced JSON and malformed strings safely', () => {
   assert.deepEqual(parseSafeJson(malformed, { fallback: true }), { fallback: true });
 });
 
-test('ECZ and Cambridge IGCSE curricula remain distinct with provenance labels', () => {
+test('ECZ, ZambiaCBC (Forms 1-6), and Cambridge IGCSE curricula, Zambian private schools, and Term 1/2 assessments are configured properly', () => {
   assert.notEqual(CURRICULA_DATA.ECZ.fullName, CURRICULA_DATA.Cambridge.fullName);
+  assert.notEqual(CURRICULA_DATA.ZambiaCBC.fullName, CURRICULA_DATA.ECZ.fullName);
   assert.ok(CURRICULA_DATA.ECZ.grades.includes('Grade 12'));
+  assert.ok(CURRICULA_DATA.ZambiaCBC.grades.includes('Form 1 (O-Level)'));
+  assert.ok(CURRICULA_DATA.ZambiaCBC.grades.includes('Form 2 (O-Level)'));
+  assert.ok(CURRICULA_DATA.ZambiaCBC.grades.includes('Form 3 (O-Level)'));
+  assert.ok(CURRICULA_DATA.ZambiaCBC.grades.includes('Form 4 (O-Level)'));
+  assert.ok(CURRICULA_DATA.ZambiaCBC.grades.includes('Form 5 (A-Level)'));
+  assert.ok(CURRICULA_DATA.ZambiaCBC.grades.includes('Form 6 (A-Level)'));
   assert.ok(CURRICULA_DATA.Cambridge.grades.includes('IGCSE Extended'));
   assert.equal(CURRICULA_DATA.Cambridge.grades.includes('Grade 12'), false);
+  assert.equal(CURRICULA_DATA.Cambridge.grades.includes('Form 5 (A-Level)'), false);
+
+  // Real Zambian private schools
+  assert.ok(ZAMBIAN_PRIVATE_SCHOOLS.includes('Rhodes Park School (Lusaka)'));
+  assert.ok(ZAMBIAN_PRIVATE_SCHOOLS.includes('Baobab College (Lusaka)'));
+  assert.ok(ZAMBIAN_PRIVATE_SCHOOLS.length >= 8);
+
+  // Term 1 & Term 2 assessments (for Forms 1-3 instead of final exam day counter)
+  const termAssessments = DEFAULT_EXAM_DATES.filter((d) => d.assessmentKind === 'term_assessment');
+  assert.equal(termAssessments.length, 2);
+  assert.ok(termAssessments.some((t) => t.term === 'Term 1'));
+  assert.ok(termAssessments.some((t) => t.term === 'Term 2'));
 
   for (const q of SAMPLE_PRACTICE_QUESTIONS) {
     assert.ok(q.provenanceLabel && q.provenanceLabel.length > 0);
   }
 });
+
+test('GET /api/export/vscode-bundle returns valid VS Code project ZIP without secrets or node_modules', async () => {
+  const res = await fetch(`${baseUrl}/api/export/vscode-bundle`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type') || '', /application\/zip/);
+  const buf = await res.arrayBuffer();
+  const zip = await JSZip.loadAsync(buf);
+  const paths = Object.keys(zip.files);
+
+  assert.ok(paths.includes('ScholarSpark-AI/package.json'));
+  assert.ok(paths.includes('ScholarSpark-AI/server.ts'));
+  assert.ok(paths.includes('ScholarSpark-AI/src/App.tsx'));
+  assert.ok(paths.includes('ScholarSpark-AI/.vscode/launch.json'));
+  assert.ok(paths.includes('ScholarSpark-AI/scripts/ensure-deps.mjs'));
+  assert.ok(paths.includes('ScholarSpark-AI/VSCODE_SETUP.md'));
+  assert.equal(paths.some((p) => p.includes('node_modules')), false);
+  assert.equal(paths.some((p) => p.endsWith('/.env')), false);
+});
+
+test('POST /api/search/syllabus validates query length for Google Search grounding', async () => {
+  const res = await fetch(`${baseUrl}/api/search/syllabus`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'hi', curriculum: 'ECZ', subject: 'Mathematics' }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.match(body.error, /at least 4 characters/i);
+});
+
+test('POST /api/tutor rejects missing message even with tutorRole and search grounding flags', async () => {
+  const res = await fetch(`${baseUrl}/api/tutor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      curriculum: 'Cambridge',
+      subject: 'Physics',
+      tutorRole: 'web_researcher',
+      useSearchGrounding: true,
+      history: [{ role: 'user', content: 'Previous turn' }],
+    }),
+  });
+  assert.equal(res.status, 400);
+});
+
+

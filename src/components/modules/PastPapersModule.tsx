@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { CURRICULA_DATA } from '../../data/curriculums';
+import { CurriculumType } from '../../types';
 import {
   BookOpenCheck,
   Filter,
@@ -17,7 +17,7 @@ import {
 
 interface PastPaperItem {
   id: string;
-  curriculum: 'ECZ' | 'Cambridge';
+  curriculum: CurriculumType;
   subject: string;
   year: number;
   season?: 'May/June' | 'Oct/Nov' | 'July GCE' | 'November Main';
@@ -146,6 +146,75 @@ export const PastPapersModule: React.FC = () => {
       provenance: 'Verified Syllabus Blueprint',
       topicsCovered: ['Stoichiometry', 'Organic Polymers', 'Electrolysis', 'Equilibrium'],
     },
+    // Zambia CBC Form 3-6 Blueprints
+    {
+      id: 'zcbc-math-f4-bp',
+      curriculum: 'ZambiaCBC',
+      subject: 'Mathematics',
+      year: 2024,
+      season: 'November Main',
+      paperName: 'Form 3–4 O-Level Competence Mathematics Blueprint',
+      paperCode: 'CBC-O-MATH',
+      duration: '2 Hours (Applied & Problem-Solving)',
+      marks: 100,
+      provenance: 'AI-Generated Exam Practice',
+      topicsCovered: [
+        'Algebraic Modelling, Quadratics & Polynomials (Form 3–4)',
+        'Matrices, Linear Programming & Earth Geometry (Form 4)',
+        'Probability & Data Interpretation Projects (Form 3–4)',
+      ],
+    },
+    {
+      id: 'zcbc-math-f6-bp',
+      curriculum: 'ZambiaCBC',
+      subject: 'Mathematics',
+      year: 2024,
+      season: 'November Main',
+      paperName: 'Form 5–6 A-Level STEM Pure Maths & Mechanics Blueprint',
+      paperCode: 'CBC-A-MATH',
+      duration: '2 Hours 30 Min (Extended Analytical)',
+      marks: 100,
+      provenance: 'AI-Generated Exam Practice',
+      topicsCovered: [
+        'A-Level Pure Maths: Calculus (Differential & Integral) (Form 5–6)',
+        'A-Level Pure Maths: Complex Numbers, Series & Proofs (Form 5–6)',
+        'A-Level Mechanics: Kinematics, Forces & Newton’s Laws (Form 5–6)',
+      ],
+    },
+    {
+      id: 'zcbc-phy-f4-bp',
+      curriculum: 'ZambiaCBC',
+      subject: 'Physics',
+      year: 2024,
+      season: 'November Main',
+      paperName: 'Form 3–4 O-Level Separate Physics & SBA Blueprint',
+      paperCode: 'CBC-O-PHY',
+      duration: '2 Hours + Practical SBA',
+      marks: 80,
+      provenance: 'AI-Generated Exam Practice',
+      topicsCovered: [
+        'Mechanics, Equilibrium, Moments & Energy Systems (Form 3–4)',
+        'Current Electricity, Circuits & Domestic Wiring Safety (Form 3–4)',
+        'Electromagnetism, Motors & Renewable Power Generation (Form 4)',
+      ],
+    },
+    {
+      id: 'zcbc-cs-f5-bp',
+      curriculum: 'ZambiaCBC',
+      subject: 'Computer Science & ICT',
+      year: 2024,
+      season: 'November Main',
+      paperName: 'Form 5–6 A-Level Computing & Applied Software Blueprint',
+      paperCode: 'CBC-A-CS',
+      duration: '2 Hours 30 Min + Project',
+      marks: 100,
+      provenance: 'AI-Generated Exam Practice',
+      topicsCovered: [
+        'A-Level Data Structures, Recursion & Algorithm Complexity (Form 5–6)',
+        'A-Level Computer Architecture, Networking & Operating Systems (Form 5–6)',
+        'Relational Databases, SQL & Spreadsheet Modelling (Form 4)',
+      ],
+    },
   ];
 
   const curriculumSubjects = Array.from(
@@ -249,7 +318,7 @@ export const PastPapersModule: React.FC = () => {
           <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
             <Filter className="w-3.5 h-3.5" /> Year:
           </span>
-          {(['all', 2023, 2022, 2021] as const).map((yr) => (
+          {(['all', 2024, 2023, 2022, 2021] as const).map((yr) => (
             <button
               key={yr}
               onClick={() => setSelectedYear(yr)}

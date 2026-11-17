@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { CurriculumType, ExplanationDifficulty, LocalLanguageAid } from '../types';
 import { CURRICULA_DATA } from '../data/curriculums';
-import { X, Check, BookOpen, Sparkles, Globe, Compass, GraduationCap } from 'lucide-react';
+import { X, Check, Globe, GraduationCap } from 'lucide-react';
 
 interface CurriculumModalProps {
   isOpen: boolean;
@@ -45,14 +45,14 @@ export const CurriculumModal: React.FC<CurriculumModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-[#0F1E36] border border-slate-700 w-full max-w-3xl rounded-2xl shadow-2xl text-white overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 overflow-y-auto">
+      <div className="bg-[#0F1E36] border border-slate-700 w-full max-w-3xl rounded-xl text-white overflow-hidden my-8">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-[#0B192C]">
           <div className="flex items-center gap-2.5">
             <GraduationCap className="w-5 h-5 text-teal-400" />
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">Curriculum & Study Settings</h2>
+              <h2 className="text-base sm:text-lg font-bold text-white">Curriculum &amp; Study Settings</h2>
               <p className="text-xs text-slate-400">Tailor AI tutoring and exam practice to your exact syllabus</p>
             </div>
           </div>
@@ -71,8 +71,8 @@ export const CurriculumModal: React.FC<CurriculumModalProps> = ({ isOpen, onClos
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
               1. Choose Examination Board / Curriculum
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(['ECZ', 'Cambridge'] as CurriculumType[]).map((cKey) => {
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {(['ECZ', 'ZambiaCBC', 'Cambridge'] as CurriculumType[]).map((cKey) => {
                 const meta = CURRICULA_DATA[cKey];
                 const isSelected = curriculum === cKey;
                 return (
@@ -80,9 +80,9 @@ export const CurriculumModal: React.FC<CurriculumModalProps> = ({ isOpen, onClos
                     key={cKey}
                     type="button"
                     onClick={() => handleCurriculumSelect(cKey)}
-                    className={`p-4 rounded-xl text-left border transition-all relative ${
+                    className={`p-4 rounded-xl text-left border transition-colors relative ${
                       isSelected
-                        ? 'bg-teal-500/15 border-teal-400 ring-1 ring-teal-400/50 shadow-md'
+                        ? 'bg-teal-500/15 border-teal-400'
                         : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
                     }`}
                   >
@@ -149,14 +149,18 @@ export const CurriculumModal: React.FC<CurriculumModalProps> = ({ isOpen, onClos
                     }`}
                   >
                     <div className="font-semibold text-xs sm:text-sm">{sub.name}</div>
-                    {sub.code && <div className="text-[10px] text-teal-300 font-mono mt-0.5">{sub.code}</div>}
+                    {sub.pathway ? (
+                      <div className="text-[10px] text-teal-300 font-mono mt-0.5">{sub.pathway}</div>
+                    ) : sub.code ? (
+                      <div className="text-[10px] text-teal-300 font-mono mt-0.5">{sub.code}</div>
+                    ) : null}
                   </button>
                 );
               })}
             </div>
             {currentSubjectData && (
               <div className="mt-2 p-2.5 rounded-lg bg-slate-900/40 border border-slate-800 text-[11px] text-slate-300">
-                <span className="font-semibold text-teal-300">Exam Papers:</span> {currentSubjectData.papersDescription}
+                <span className="font-semibold text-teal-300">Assessment &amp; Papers:</span> {currentSubjectData.papersDescription}
               </div>
             )}
           </div>
@@ -233,7 +237,7 @@ export const CurriculumModal: React.FC<CurriculumModalProps> = ({ isOpen, onClos
                   </span>
                 </label>
 
-                {curriculum === 'ECZ' && (
+                {(curriculum === 'ECZ' || curriculum === 'ZambiaCBC') && (
                   <div className="flex items-center gap-2 text-xs">
                     <Globe className="w-3.5 h-3.5 text-teal-400 shrink-0" />
                     <span className="text-slate-400">Local language aid:</span>
@@ -261,9 +265,9 @@ export const CurriculumModal: React.FC<CurriculumModalProps> = ({ isOpen, onClos
           </p>
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm transition-colors shadow-lg shadow-teal-500/20"
+            className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm transition-colors"
           >
-            Apply & Continue
+            Apply &amp; Continue
           </button>
         </div>
       </div>

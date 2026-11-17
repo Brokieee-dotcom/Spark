@@ -1,8 +1,10 @@
 import express, { Request, Response } from 'express';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import JSZip from 'jszip';
 
 dotenv.config();
 
@@ -47,9 +49,15 @@ app.use((req: Request, res: Response, next: () => void) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+const rawApiKey = (process.env.GEMINI_API_KEY || '').trim();
+const isApiKeyConfigured =
+  Boolean(rawApiKey) &&
+  rawApiKey !== 'YOUR_GEMINI_API_KEY_HERE' &&
+  rawApiKey !== 'MY_GEMINI_API_KEY';
+
 // Initialize GoogleGenAI SDK with required User-Agent
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey: isApiKeyConfigured ? rawApiKey : undefined,
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
@@ -57,66 +65,191 @@ const ai = new GoogleGenAI({
   },
 });
 
+const modelCooldownUntil = new Map<string, number>();
+const RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000;
+
+function isRateLimitError(err: any): boolean {
+  const msg = String(err?.message || '');
+  const status = err?.status || err?.code;
+  return (
+    status === 429 ||
+    msg.includes('429') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('Resource has been exhausted') ||
+    msg.includes('quota')
+  );
+}
+
+function isTransientCapacityError(err: any): boolean {
+  const msg = String(err?.message || '');
+  const status = err?.status || err?.code;
+  return (
+    status === 503 ||
+    msg.includes('503') ||
+    msg.includes('high demand') ||
+    msg.includes('UNAVAILABLE') ||
+    msg.includes('temporarily')
+  );
+}
+
+function orderModelsWithCooldown(candidates: string[]): string[] {
+  const unique = Array.from(new Set(candidates));
+  const now = Date.now();
+  const ready = unique.filter((m) => (modelCooldownUntil.get(m) || 0) <= now);
+  return ready.length > 0 ? ready : unique;
+}
+
 /**
- * Resilient Gemini Call with Automatic Retry and Model Failover.
- * Uses the active free-tier model chain ('gemini-4-hydrogen' -> 'gemini-3.1-flash-lite' -> 'gemini-flash-latest')
- * with automatic retry/failover on 503/429 demand spikes.
+ * Resilient Gemini Call with Smart Cooldown & Model Failover.
+ * Uses active free-tier models ('gemini-3.1-flash-lite', 'gemini-4-hydrogen', 'gemini-flash-latest').
+ * Immediately rotates on 429 quota/rate limits without retrying the exhausted model.
  */
 async function callGeminiSafe(params: {
   contents: any;
   config?: any;
   preferredModel?: string;
 }): Promise<any> {
-  const models = [
-    params.preferredModel || 'gemini-4-hydrogen',
+  const ordered = orderModelsWithCooldown([
+    params.preferredModel || 'gemini-3.1-flash-lite',
     'gemini-3.1-flash-lite',
+    'gemini-4-hydrogen',
     'gemini-flash-latest',
-  ];
+  ]);
 
   let lastError: any = null;
 
-  for (const model of models) {
+  for (const model of ordered) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
+        const configForModel = { ...params.config };
+        if (model !== 'gemini-4-hydrogen' && configForModel?.thinkingConfig) {
+          delete configForModel.thinkingConfig;
+        }
         const response = await ai.models.generateContent({
           model,
           contents: params.contents,
-          config: params.config,
+          config: configForModel,
         });
         return response;
       } catch (err: any) {
         lastError = err;
-        const msg = String(err?.message || '');
-        const status = err?.status || err?.code;
-        const isCapacityError =
-          status === 503 ||
-          status === 429 ||
-          msg.includes('503') ||
-          msg.includes('high demand') ||
-          msg.includes('UNAVAILABLE') ||
-          msg.includes('temporarily') ||
-          msg.includes('Resource has been exhausted') ||
-          msg.includes('quota');
 
-        console.warn(`[Gemini Safe Router] Model ${model} (attempt ${attempt}) warning: ${msg}`);
-
-        if (isCapacityError) {
-          if (attempt === 1) {
-            // Brief backoff before re-trying
-            await new Promise((r) => setTimeout(r, 600));
-            continue;
-          }
-          // On second fail, break to try next model in fallback list
+        if (isRateLimitError(err)) {
+          modelCooldownUntil.set(model, Date.now() + RATE_LIMIT_COOLDOWN_MS);
+          console.info(`[Gemini Router] ${model} quota busy (429); rotating immediately.`);
           break;
         }
 
-        // If it's another non-capacity error on first attempt, try once more or fallback
+        if (isTransientCapacityError(err) && attempt === 1) {
+          await new Promise((r) => setTimeout(r, 600));
+          continue;
+        }
+
         break;
       }
     }
   }
 
   throw lastError || new Error('The AI service is temporarily experiencing high load across all endpoints. Please retry in a few seconds.');
+}
+
+function formatGeminiError(err: any, fallbackMsg: string): { status: number; message: string } {
+  const rawMsg = String(err?.message || '');
+  const status = err?.status || err?.code;
+  if (status === 429 || rawMsg.includes('RESOURCE_EXHAUSTED') || rawMsg.includes('"code":429')) {
+    return {
+      status: 429,
+      message:
+        'Gemini API rate limit or free-tier quota reached. Please wait a few seconds and retry, or upgrade to a billing-enabled API key in Settings > Secrets.',
+    };
+  }
+  if (
+    status === 403 ||
+    rawMsg.includes('PERMISSION_DENIED') ||
+    rawMsg.includes('API_KEY_INVALID')
+  ) {
+    return {
+      status: 403,
+      message:
+        'Gemini API key permission error. Please verify your GEMINI_API_KEY in Settings > Secrets.',
+    };
+  }
+  return { status: 500, message: rawMsg || fallbackMsg };
+}
+
+interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
+function extractGroundingSources(response: any): GroundingSource[] {
+  const chunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  if (!Array.isArray(chunks)) return [];
+  const seen = new Set<string>();
+  const sources: GroundingSource[] = [];
+  for (const chunk of chunks) {
+    const uri = chunk?.web?.uri;
+    const title = chunk?.web?.title || uri;
+    if (typeof uri === 'string' && uri.startsWith('http') && !seen.has(uri)) {
+      seen.add(uri);
+      sources.push({ title: String(title), uri });
+    }
+  }
+  return sources;
+}
+
+async function sendChatWithRetry(params: {
+  model: string;
+  history: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
+  message: string;
+  config: any;
+}): Promise<{ response: any; modelUsed: string }> {
+  const candidates = orderModelsWithCooldown([
+    params.model,
+    'gemini-3.1-flash-lite',
+    'gemini-4-hydrogen',
+    'gemini-flash-latest',
+  ]);
+
+  let lastError: any = null;
+  for (const model of candidates) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const configForModel = { ...params.config };
+        if (model !== 'gemini-4-hydrogen' && configForModel.thinkingConfig) {
+          delete configForModel.thinkingConfig;
+        }
+        // Only gemini-4-hydrogen uses googleSearch here
+        if (model !== 'gemini-4-hydrogen' && configForModel.tools) {
+          delete configForModel.tools;
+        }
+
+        const chat = ai.chats.create({
+          model,
+          history: params.history,
+          config: configForModel,
+        });
+        const response = await chat.sendMessage({ message: params.message });
+        return { response, modelUsed: model };
+      } catch (err: any) {
+        lastError = err;
+
+        if (isRateLimitError(err)) {
+          modelCooldownUntil.set(model, Date.now() + RATE_LIMIT_COOLDOWN_MS);
+          console.info(`[Gemini Chat Router] ${model} quota busy (429); failing over immediately.`);
+          break;
+        }
+
+        if (isTransientCapacityError(err) && attempt === 1) {
+          await new Promise((r) => setTimeout(r, 600));
+          continue;
+        }
+
+        break;
+      }
+    }
+  }
+  throw lastError || new Error('The AI chat service is temporarily unavailable. Please retry.');
 }
 
 // Simple in-memory rate limiter / quota tracker for Freemium tier
@@ -189,6 +322,20 @@ export function parseSafeJson<T>(raw: string, fallback: T): T {
   }
 }
 
+function parseRequiredJson<T>(raw: string | undefined, endpointLabel: string): T {
+  const text = (raw || '').trim();
+  if (!text) {
+    throw new Error(`${endpointLabel} returned an empty AI response. Please retry.`);
+  }
+  let cleaned = text;
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
+  }
+  return JSON.parse(cleaned) as T;
+}
+
 // ==========================================
 // 1. Health & Status
 // ==========================================
@@ -197,9 +344,13 @@ app.get('/api/health', (_req: Request, res: Response) => {
     status: 'ok',
     service: 'ScholarSpark AI Resilient Full-Stack Service',
     time: new Date().toISOString(),
-    apiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
-    models: ['gemini-4-hydrogen (Primary)', 'gemini-3.1-flash-lite (Failover)', 'gemini-flash-latest (Failover)'],
-    curriculumsSupported: ['ECZ (Examinations Council of Zambia)', 'Cambridge IGCSE'],
+    apiKeyConfigured: isApiKeyConfigured,
+    models: ['gemini-3.1-flash-lite (Primary)', 'gemini-4-hydrogen (Search/Reasoning)', 'gemini-flash-latest (Failover)'],
+    curriculumsSupported: [
+      'ECZ (Examinations Council of Zambia · Grades 7–12)',
+      'Zambia CBC (2023 Competence-Based Curriculum · Forms 1–6 O-Level & A-Level)',
+      'Cambridge IGCSE',
+    ],
   });
 });
 
@@ -216,8 +367,85 @@ app.get('/api/quota', (req: Request, res: Response) => {
 });
 
 // ==========================================
-// 2. AI Tutor
+// 1b. Downloadable VS Code Project Bundle
 // ==========================================
+const EXCLUDED_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'dist-server',
+  'docs',
+  '.git',
+  'coverage',
+  '.nyc_output',
+]);
+
+function shouldExcludeFile(filename: string): boolean {
+  if (
+    filename === '.env' ||
+    filename.startsWith('.env.local') ||
+    filename.startsWith('.env.production') ||
+    filename === 'bun.lock' ||
+    filename.startsWith('service-account')
+  ) {
+    return true;
+  }
+  const lower = filename.toLowerCase();
+  return (
+    lower.endsWith('.key') ||
+    lower.endsWith('.pem') ||
+    lower.endsWith('.log') ||
+    lower.endsWith('.zip')
+  );
+}
+
+function addDirToZip(zipFolder: JSZip, dirPath: string) {
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (EXCLUDED_DIRS.has(entry.name)) continue;
+      const subFolder = zipFolder.folder(entry.name);
+      if (subFolder) {
+        addDirToZip(subFolder, path.join(dirPath, entry.name));
+      }
+    } else if (entry.isFile()) {
+      if (shouldExcludeFile(entry.name)) continue;
+      const fullPath = path.join(dirPath, entry.name);
+      zipFolder.file(entry.name, fs.readFileSync(fullPath));
+    }
+  }
+}
+
+app.get('/api/export/vscode-bundle', async (_req: Request, res: Response) => {
+  try {
+    const zip = new JSZip();
+    const rootFolder = zip.folder('ScholarSpark-AI');
+    if (!rootFolder) {
+      return res.status(500).json({ error: 'Unable to initialize ZIP archive.' });
+    }
+
+    addDirToZip(rootFolder, __dirname);
+
+    const buffer = await zip.generateAsync({
+      type: 'nodebuffer',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 },
+    });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="ScholarSpark-AI-VSCode.zip"');
+    res.setHeader('Content-Length', buffer.length.toString());
+    return res.send(buffer);
+  } catch (err: any) {
+    console.error('VS Code Bundle Export Error:', err);
+    return res.status(500).json({ error: 'Failed to package VS Code project archive.' });
+  }
+});
+
+// ==========================================
+// 2. Multi-Turn AI Chatbot & Search Grounding
+// ==========================================
+type TutorRole = 'examiner' | 'fast_coach' | 'deep_reasoner' | 'web_researcher';
+
 app.post('/api/tutor', checkQuota, async (req: Request, res: Response) => {
   try {
     const {
@@ -229,6 +457,8 @@ app.post('/api/tutor', checkQuota, async (req: Request, res: Response) => {
       difficulty = 'standard',
       simpleLanguageMode = false,
       localLanguage = 'none',
+      tutorRole = 'examiner',
+      useSearchGrounding = false,
       history = [],
     } = req.body;
 
@@ -236,7 +466,7 @@ app.post('/api/tutor', checkQuota, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'A question or message is required.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isApiKeyConfigured) {
       return res.status(503).json({
         error: 'Gemini API key is not configured. Please ensure GEMINI_API_KEY is configured in Settings > Secrets.',
       });
@@ -251,10 +481,28 @@ app.post('/api/tutor', checkQuota, async (req: Request, res: Response) => {
       localLangPrompt = 'Include brief, polite Zambian Tonga terminology/phrasing aids alongside formal English.';
     }
 
+    const validRole: TutorRole = ['examiner', 'fast_coach', 'deep_reasoner', 'web_researcher'].includes(tutorRole)
+      ? tutorRole
+      : 'examiner';
+
+    const roleDescriptions: Record<TutorRole, string> = {
+      examiner:
+        'ROLE — Syllabus Examiner & Tutor: Deliver clear pedagogical explanations aligned with official mark schemes, highlighting Method (M) and Accuracy (A) marks.',
+      fast_coach:
+        'ROLE — Fast Study Coach: Deliver crisp, high-speed revision summaries, key formulas, and concise 1-minute exam checkpoints.',
+      deep_reasoner:
+        'ROLE — Deep Step-by-Step Solver: Perform rigorous multi-step derivations, proof checks, and error diagnostics for challenging problems.',
+      web_researcher:
+        'ROLE — Live Web-Grounded Researcher: Use Google Search grounding to retrieve up-to-date facts, current syllabus announcements, exam dates, and real-world scientific/economic context.',
+    };
+
     const systemInstruction = `
-You are ScholarSpark AI, an elite educational tutor specifically tailored for students sitting either:
-1. ECZ (Examinations Council of Zambia - Grades 7, 9, 12, and GCE).
-2. Cambridge Assessment International Education (IGCSE Core/Extended, O-Level, AS/A-Level).
+You are ScholarSpark AI, an educational chatbot specifically tailored for students sitting:
+1. ECZ Legacy Syllabi (Examinations Council of Zambia - Grades 7, 9, 12, and GCE).
+2. Zambia Competence-Based Curriculum (ZambiaCBC / 2023 ZECF - Form 1–4 Ordinary Level across 8 career pathways with practical/SBA competence and Term 1/Term 2 formative assessments for Forms 1–3, plus Form 5–6 Advanced Level / A-Level specializations).
+3. Cambridge Assessment International Education (IGCSE Core/Extended, O-Level, AS/A-Level).
+
+${roleDescriptions[validRole]}
 
 CURRENT STUDENT CONTEXT:
 - Target Curriculum: ${curriculum}
@@ -266,41 +514,133 @@ CURRENT STUDENT CONTEXT:
 ${localLangPrompt ? `- Local Language Aid: ${localLangPrompt}` : ''}
 
 RULES:
+- If Target Curriculum is ZambiaCBC (or Level is Form 1/2/3/4/5/6), adapt depth cleanly: Forms 1–2 foundational competence concepts, Forms 3–4 applied O-Level pathways and SBA skills, and Forms 5–6 rigorous A-Level pre-university depth.
+- Answer directly, truthfully, and accurately based on verified academic knowledge and real syllabus principles. If you are unsure of a specific recent circular or date, state that clearly instead of guessing.
+- Maintain continuity across the multi-turn conversation thread.
 - Provide clear, pedagogical explanations with worked step-by-step examples when solving problems.
-- If the student asks for mathematics or science calculations, explicitly display the formula first, state given values, show step-by-step substitution, and conclude with the final answer with correct units.
-- Never claim affiliation with or endorsement by ECZ, Cambridge International, or Google.
-- If there is uncertainty or syllabus variance between years, state it clearly.
-- Provide 2-3 proactive follow-up suggestions at the end to prompt deeper inquiry.
+- For mathematics or science calculations, explicitly display the formula first, state given values, show step-by-step substitution, and conclude with the final answer and units.
+- Never claim affiliation with or endorsement by ECZ, Ministry of Education / CDC Zambia, Cambridge International, or Google.
+- End with 2-3 proactive follow-up prompts to continue the study conversation.
 `;
 
-    const conversationContents: any[] = [];
+    const formattedHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
     if (Array.isArray(history) && history.length > 0) {
-      for (const turn of history.slice(-6)) {
-        conversationContents.push({
-          role: turn.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: turn.content }],
-        });
+      for (const turn of history.slice(-12)) {
+        if (turn && typeof turn.content === 'string' && turn.content.trim()) {
+          formattedHistory.push({
+            role: turn.role === 'assistant' || turn.role === 'model' ? 'model' : 'user',
+            parts: [{ text: turn.content }],
+          });
+        }
       }
     }
-    conversationContents.push({
-      role: 'user',
-      parts: [{ text: message }],
+
+    const enableSearch = Boolean(useSearchGrounding) || validRole === 'web_researcher';
+    let selectedModel = 'gemini-3.1-flash-lite';
+    const chatConfig: any = {
+      systemInstruction,
+    };
+
+    if (enableSearch) {
+      selectedModel = 'gemini-4-hydrogen';
+      chatConfig.tools = [{ googleSearch: {} }];
+    } else if (validRole === 'fast_coach' || validRole === 'examiner') {
+      selectedModel = 'gemini-3.1-flash-lite';
+    } else if (validRole === 'deep_reasoner') {
+      selectedModel = 'gemini-4-hydrogen';
+      chatConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+    }
+
+    const { response, modelUsed } = await sendChatWithRetry({
+      model: selectedModel,
+      history: formattedHistory,
+      message,
+      config: chatConfig,
     });
 
-    const response = await callGeminiSafe({
-      contents: conversationContents,
-      config: {
-        systemInstruction,
-      },
-    });
+    const reply = (response?.text || '').trim();
+    if (!reply) {
+      return res.status(502).json({
+        error: 'The AI Tutor returned an empty response. Please click retry.',
+      });
+    }
+    const groundingSources = extractGroundingSources(response);
 
-    const reply = response.text || 'I understand your question. Let us examine this topic step by step according to your syllabus objectives.';
-    return res.json({ reply });
+    return res.json({
+      reply,
+      modelUsed,
+      roleUsed: validRole,
+      groundingSources,
+    });
   } catch (err: any) {
-    console.error('Tutor API Error:', err);
-    return res.status(500).json({
-      error: err.message || 'The AI Tutor is temporarily busy. Please click retry.',
+    const formatted = formatGeminiError(err, 'The AI Tutor is temporarily busy. Please click retry.');
+    if (formatted.status >= 500) {
+      console.error('Tutor API Error:', formatted.message);
+    }
+    return res.status(formatted.status).json({ error: formatted.message });
+  }
+});
+
+// ==========================================
+// 2b. Live Syllabus & Exam Web Search (Google Search Grounding)
+// ==========================================
+app.post('/api/search/syllabus', checkQuota, async (req: Request, res: Response) => {
+  try {
+    const { query, curriculum = 'ECZ', subject = 'General' } = req.body;
+    if (!query || typeof query !== 'string' || query.trim().length < 4) {
+      return res.status(400).json({ error: 'Please enter a search question of at least 4 characters.' });
+    }
+
+    if (!isApiKeyConfigured) {
+      return res.status(503).json({
+        error: 'Gemini API key is not configured. Please ensure GEMINI_API_KEY is configured in Settings > Secrets.',
+      });
+    }
+
+    const prompt = `Search for accurate, up-to-date information relevant to ${curriculum} (${subject}) students: "${query.trim()}". Summarize key verified facts clearly in bullet points and note any official circular or timetable dates found. Never claim official affiliation with ECZ or Cambridge International.`;
+
+    let response: any;
+    try {
+      response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      });
+    } catch (firstErr: any) {
+      if (isTransientCapacityError(firstErr)) {
+        await new Promise((r) => setTimeout(r, 600));
+        response = await ai.models.generateContent({
+          model: 'gemini-4-hydrogen',
+          contents: prompt,
+          config: {
+            tools: [{ googleSearch: {} }],
+          },
+        });
+      } else {
+        throw firstErr;
+      }
+    }
+
+    const answer = (response?.text || '').trim();
+    if (!answer) {
+      return res.status(502).json({
+        error: 'Live web search returned no grounded summary for this query. Please retry.',
+      });
+    }
+    const groundingSources = extractGroundingSources(response);
+    return res.json({
+      answer,
+      groundingSources,
+      modelUsed: 'gemini-4-hydrogen',
     });
+  } catch (err: any) {
+    const formatted = formatGeminiError(err, 'Failed to perform live web search. Please try again.');
+    if (formatted.status >= 500) {
+      console.error('Search Grounding Error:', formatted.message);
+    }
+    return res.status(formatted.status).json({ error: formatted.message });
   }
 });
 
@@ -321,7 +661,7 @@ app.post('/api/homework/scan', checkQuota, async (req: Request, res: Response) =
       return res.status(400).json({ error: 'No image data provided.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isApiKeyConfigured) {
       return res.status(503).json({ error: 'Gemini API key is not configured.' });
     }
 
@@ -393,26 +733,18 @@ You must return a valid JSON object matching the requested schema.
       },
     });
 
-    const parsed = parseSafeJson(response.text || '{}', {
-      extractedQuestion: 'Question from image',
-      topic: subject,
-      steps: [
-        {
-          stepNumber: 1,
-          title: 'Direct Solution',
-          explanation: response.text || 'Review steps',
-          working: '',
-        },
-      ],
-      finalAnswer: 'See worked steps',
-    });
+    const parsed = parseRequiredJson<any>(response?.text, 'Homework Scanner');
 
     return res.json({ result: parsed });
   } catch (err: any) {
-    console.error('Homework Scan Error:', err);
-    return res.status(500).json({
-      error: err.message || 'Failed to scan and analyze homework image. Please ensure the image is clear and retry.',
-    });
+    const formatted = formatGeminiError(
+      err,
+      'Failed to scan and analyze homework image. Please ensure the image is clear and retry.'
+    );
+    if (formatted.status >= 500) {
+      console.error('Homework Scan Error:', formatted.message);
+    }
+    return res.status(formatted.status).json({ error: formatted.message });
   }
 });
 
@@ -430,7 +762,7 @@ app.post('/api/practice/generate', checkQuota, async (req: Request, res: Respons
       type = 'mixed',
     } = req.body;
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isApiKeyConfigured) {
       return res.status(503).json({ error: 'Gemini API key is not configured.' });
     }
 
@@ -440,6 +772,7 @@ Generate ${count} realistic, curriculum-aligned exam practice questions on the t
 Each question MUST be clearly categorized as "AI-Generated Exam Practice" (never claim it is an official leaked paper).
 Format should match authentic exam conventions:
 - For ECZ: Follow ECZ Paper 1 (non-calculator, foundational/structured) or Paper 2 (calculator, structured, graphing, multi-step).
+- For ZambiaCBC: Follow Zambia's 2023 Competence-Based Curriculum — foundational & Term 1/Term 2 competence tasks for Forms 1–3, real-world scenario/application tasks for Form 4 O-Level pathways, or rigorous analytical/proof/multi-step problems for Forms 5–6 A-Level specializations.
 - For Cambridge: Follow IGCSE Core/Extended (Papers 1/3 or 2/4) or Sciences (Paper 2 MCQ / Paper 4 Theory).
 Include mark distribution [e.g., 2 marks, 3 marks, 4 marks] and detailed marking rubrics (Method M-marks, Accuracy A-marks).
 `;
@@ -489,13 +822,14 @@ Include mark distribution [e.g., 2 marks, 3 marks, 4 marks] and detailed marking
       },
     });
 
-    const questions = parseSafeJson(response.text || '[]', []);
+    const questions = parseRequiredJson<any[]>(response?.text, 'Practice Generator');
     return res.json({ questions });
   } catch (err: any) {
-    console.error('Practice Generation Error:', err);
-    return res.status(500).json({
-      error: err.message || 'Failed to generate practice questions. Please retry.',
-    });
+    const formatted = formatGeminiError(err, 'Failed to generate practice questions. Please retry.');
+    if (formatted.status >= 500) {
+      console.error('Practice Generation Error:', formatted.message);
+    }
+    return res.status(formatted.status).json({ error: formatted.message });
   }
 });
 
@@ -518,7 +852,7 @@ app.post('/api/practice/mark', checkQuota, async (req: Request, res: Response) =
       return res.status(400).json({ error: 'Question text and student answer are required.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isApiKeyConfigured) {
       return res.status(503).json({ error: 'Gemini API key is not configured.' });
     }
 
@@ -578,20 +912,15 @@ Evaluate:
       },
     });
 
-    const evaluation = parseSafeJson(response.text || '{}', {
-      marksAwarded: Math.round(totalMarks * 0.7),
-      totalMarks,
-      isFullyCorrect: false,
-      feedback: 'Answer evaluated against rubric. Compare your working with the exemplar model answer.',
-      remedialTip: 'Review method marks to ensure full credit.',
-    });
+    const evaluation = parseRequiredJson<any>(response?.text, 'Answer Marking');
 
     return res.json({ evaluation });
   } catch (err: any) {
-    console.error('Answer Marking Error:', err);
-    return res.status(500).json({
-      error: err.message || 'Failed to grade answer. Please try again.',
-    });
+    const formatted = formatGeminiError(err, 'Failed to grade answer. Please try again.');
+    if (formatted.status >= 500) {
+      console.error('Answer Marking Error:', formatted.message);
+    }
+    return res.status(formatted.status).json({ error: formatted.message });
   }
 });
 
@@ -608,7 +937,7 @@ app.post('/api/flashcards/generate', checkQuota, async (req: Request, res: Respo
       count = 10,
     } = req.body;
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isApiKeyConfigured) {
       return res.status(503).json({ error: 'Gemini API key is not configured.' });
     }
 
@@ -645,13 +974,14 @@ Create concise question-and-answer pairs:
       },
     });
 
-    const cards = parseSafeJson(response.text || '[]', []);
+    const cards = parseRequiredJson<any[]>(response?.text, 'Flashcard Generator');
     return res.json({ cards });
   } catch (err: any) {
-    console.error('Flashcard Generation Error:', err);
-    return res.status(500).json({
-      error: err.message || 'Failed to generate flashcards. Please retry.',
-    });
+    const formatted = formatGeminiError(err, 'Failed to generate flashcards. Please retry.');
+    if (formatted.status >= 500) {
+      console.error('Flashcard Generation Error:', formatted.message);
+    }
+    return res.status(formatted.status).json({ error: formatted.message });
   }
 });
 
@@ -666,7 +996,7 @@ app.post('/api/notes/summarize', checkQuota, async (req: Request, res: Response)
       return res.status(400).json({ error: 'Please provide notes with at least 20 characters.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isApiKeyConfigured) {
       return res.status(503).json({ error: 'Gemini API key is not configured.' });
     }
 
@@ -726,19 +1056,15 @@ Produce:
       },
     });
 
-    const summaryData = parseSafeJson(response.text || '{}', {
-      summary: 'Executive summary generated.',
-      keyTerms: [],
-      revisionPoints: ['Review core syllabus terms and formulas.'],
-      practiceQuestions: [],
-    });
+    const summaryData = parseRequiredJson<any>(response?.text, 'Notes Summarizer');
 
     return res.json({ summary: summaryData });
   } catch (err: any) {
-    console.error('Notes Summarize Error:', err);
-    return res.status(500).json({
-      error: err.message || 'Failed to summarize notes. Please try again.',
-    });
+    const formatted = formatGeminiError(err, 'Failed to summarize notes. Please try again.');
+    if (formatted.status >= 500) {
+      console.error('Notes Summarize Error:', formatted.message);
+    }
+    return res.status(formatted.status).json({ error: formatted.message });
   }
 });
 
@@ -755,7 +1081,7 @@ app.post('/api/timetable/generate', checkQuota, async (req: Request, res: Respon
       weakTopics = [],
     } = req.body;
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isApiKeyConfigured) {
       return res.status(503).json({ error: 'Gemini API key is not configured.' });
     }
 
@@ -809,17 +1135,15 @@ Generate 7 daily schedules with specific blocks, rest breaks (Pomodoro style), a
       },
     });
 
-    const timetable = parseSafeJson(response.text || '{}', {
-      strategyOverview: 'Balanced 7-day revision strategy.',
-      days: [],
-    });
+    const timetable = parseRequiredJson<any>(response?.text, 'Timetable Generator');
 
     return res.json({ timetable });
   } catch (err: any) {
-    console.error('Timetable Generation Error:', err);
-    return res.status(500).json({
-      error: err.message || 'Failed to generate timetable.',
-    });
+    const formatted = formatGeminiError(err, 'Failed to generate timetable.');
+    if (formatted.status >= 500) {
+      console.error('Timetable Generation Error:', formatted.message);
+    }
+    return res.status(formatted.status).json({ error: formatted.message });
   }
 });
 

@@ -10,6 +10,7 @@ export interface CurriculumMeta {
   subjects: {
     name: string;
     code?: string;
+    pathway?: string;
     topics: string[];
     papersDescription: string;
   }[];
@@ -159,6 +160,245 @@ export const CURRICULA_DATA: Record<CurriculumType, CurriculumMeta> = {
     ],
     disclaimer:
       'ScholarSpark AI is an independent study aid and is NOT affiliated with, sponsored by, or endorsed by the Examinations Council of Zambia (ECZ).',
+  },
+  ZambiaCBC: {
+    id: 'ZambiaCBC',
+    title: 'Zambia CBC (Forms 1–6)',
+    fullName: 'Zambia Competence-Based Curriculum (2023 ZECF)',
+    region: 'Zambia · Forms 1–4 (O-Level) & Forms 5–6 (A-Level)',
+    officialBoard: 'Ministry of Education / CDC / ECZ (Zambia)',
+    grades: [
+      'Form 1 (O-Level)',
+      'Form 2 (O-Level)',
+      'Form 3 (O-Level)',
+      'Form 4 (O-Level)',
+      'Form 5 (A-Level)',
+      'Form 6 (A-Level)',
+    ],
+    subjects: [
+      {
+        name: 'Mathematics',
+        code: 'O-Level & A-Level STEM',
+        pathway: 'Core & STEM Pathway',
+        papersDescription:
+          'Forms 1–2: Foundation Numeracy & Term 1/2 Competence Assessments | Forms 3–4 O-Level: Applied Problem Solving | Forms 5–6 A-Level: Pure Maths, Mechanics & Statistics',
+        topics: [
+          'Number Systems, Integers, Fractions & Ratios (Form 1–2)',
+          'Linear Equations, Basic Geometry & Mensuration (Form 1–2)',
+          'Algebraic Modelling, Quadratics & Polynomials (Form 3–4)',
+          'Coordinate Geometry, Vectors & Transformations (Form 3–4)',
+          'Trigonometry, Mensuration & Financial Arithmetic (Form 3–4)',
+          'Matrices, Linear Programming & Earth Geometry (Form 4)',
+          'Probability & Data Interpretation Projects (Form 3–4)',
+          'A-Level Pure Maths: Calculus (Differential & Integral) (Form 5–6)',
+          'A-Level Pure Maths: Complex Numbers, Series & Proofs (Form 5–6)',
+          'A-Level Mechanics: Kinematics, Forces & Newton’s Laws (Form 5–6)',
+          'A-Level Statistics: Distributions & Hypothesis Testing (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Physics',
+        code: 'Natural Science & STEM',
+        pathway: 'Natural Science / Technology / STEM',
+        papersDescription:
+          'Separate Science: Forms 1–2 Term 1/2 Practical Foundations | Forms 3–4 O-Level & SBA | Forms 5–6 A-Level Physics',
+        topics: [
+          'Measurements, SI Units, Density & Forces Basics (Form 1–2)',
+          'Simple Machines, Heat Transfer & Basic Light Rays (Form 1–2)',
+          'Mechanics, Equilibrium, Moments & Energy Systems (Form 3–4)',
+          'Thermal Physics, Gas Laws & Energy Efficiency (Form 3–4)',
+          'Waves, Optics & Acoustic Applications (Form 3–4)',
+          'Current Electricity, Circuits & Domestic Wiring Safety (Form 3–4)',
+          'Electromagnetism, Motors & Renewable Power Generation (Form 4)',
+          'A-Level Fields: Gravitational, Electric & Magnetic Fields (Form 5–6)',
+          'A-Level Quantum Physics, Nuclear Binding & Particle Models (Form 5–6)',
+          'A-Level Oscillations, Medical Imaging & Electronics (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Chemistry',
+        code: 'Natural Science & STEM',
+        pathway: 'Natural Science / Agriculture / STEM',
+        papersDescription:
+          'Separate Science: Applied Chemical Principles, Titration/Qualitative Practicals & Environmental Chemistry',
+        topics: [
+          'Matter, Separation Techniques & Water Purification (Form 1–2)',
+          'Elements, Compounds, Mixtures & Laboratory Safety (Form 1–2)',
+          'Atomic Structure, Chemical Bonding & Periodic Trends (Form 3–4)',
+          'Stoichiometry, Mole Concept & Volumetric Analysis (Form 3–4)',
+          'Acids, Bases, Salts & Industrial Chemical Processes (Form 3–4)',
+          'Electrochemistry, Extraction of Copper & Corrosion Control (Form 4)',
+          'Organic Chemistry: Hydrocarbons, Alcohols & Polymers (Form 4)',
+          'A-Level Chemical Energetics, Kinetics & Equilibrium (Kc/Kp) (Form 5–6)',
+          'A-Level Transition Elements & Coordination Chemistry (Form 5–6)',
+          'A-Level Organic Synthesis, Spectroscopy & Green Chemistry (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Biology',
+        code: 'Natural Science & STEM',
+        pathway: 'Natural Science / Home Economics / Sports',
+        papersDescription:
+          'Separate Science: Competence Practicals, Ecological Fieldwork & A-Level Molecular Biology',
+        topics: [
+          'Classification, Microscopes & Plant/Animal Cells (Form 1–2)',
+          'Nutrition, Hygiene & Flowering Plant Reproduction (Form 1–2)',
+          'Cell Biology, Enzymes & Membrane Transport (Form 3–4)',
+          'Plant Nutrition, Transport & Food Security Crops (Form 3–4)',
+          'Human Physiology: Circulation, Respiration & Excretion (Form 3–4)',
+          'Genetics, Inheritance & Public Health Biotechnology (Form 4)',
+          'Ecology, Zambian Biodiversity & Climate Conservation (Form 4)',
+          'A-Level Biochemistry, DNA Replication & Protein Synthesis (Form 5–6)',
+          'A-Level Cellular Respiration, Photosynthesis & Homeostasis (Form 5–6)',
+          'A-Level Immunology, Gene Technology & Evolutionary Genomics (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Computer Science & ICT',
+        code: 'Technology & STEM',
+        pathway: 'Technology / Digital Literacy / STEM',
+        papersDescription:
+          'Applied Programming, Digital Systems, Databases, Cybersecurity & Practical Software Projects',
+        topics: [
+          'Computer Basics, Productivity Tools & Online Safety (Form 1–2)',
+          'Digital Literacy, Cloud Collaboration & Cyber Ethics (Form 1–4)',
+          'Binary Logic, Data Representation & Hardware Systems (Form 3–4)',
+          'Algorithms, Flowcharts & Structured Programming (Python) (Form 3–4)',
+          'Relational Databases, SQL & Spreadsheet Modelling (Form 4)',
+          'A-Level Data Structures, Recursion & Algorithm Complexity (Form 5–6)',
+          'A-Level Computer Architecture, Networking & Operating Systems (Form 5–6)',
+          'A-Level Software Engineering Project & Applied AI Ethics (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Agricultural Science',
+        code: 'Agriculture Pathway',
+        pathway: 'Agricultural Science / STEM',
+        papersDescription:
+          'Theory + Competence Farm Practice, Agribusiness Entrepreneurship & Sustainable Soil/Livestock Management',
+        topics: [
+          'Soil Science, Fertility Conservation & Climate-Smart Farming (Form 3–4)',
+          'Crop Production, Pest Management & Irrigation Systems (Form 3–4)',
+          'Livestock Husbandry, Nutrition & Disease Prevention (Form 4)',
+          'Agribusiness, Value Addition & Farm Entrepreneurship (Form 4)',
+          'A-Level Crop Genetics, Plant Biotechnology & Precision Agriculture (Form 5–6)',
+          'A-Level Agricultural Economics, Supply Chains & Food Systems (Form 5–6)',
+        ],
+      },
+      {
+        name: 'English & Literature',
+        code: 'Core & Languages',
+        pathway: 'Core Compulsory / Social Sciences & Languages',
+        papersDescription:
+          'Functional Communication, Critical Reading, Directed Writing & A-Level Literary Analysis',
+        topics: [
+          'Functional & Directed Writing (Reports, Proposals, Formal Letters) (Form 3–4)',
+          'Critical Comprehension, Summary & Inference Skills (Form 3–4)',
+          'Grammar Transformations, Rhetoric & Oral Communication (Form 3–4)',
+          'Zambian & African Literature: Prose, Drama & Poetry (Form 3–6)',
+          'A-Level Stylistics, Discourse Analysis & Comparative Literature (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Civic Education',
+        code: 'Core Compulsory',
+        pathway: 'Core Compulsory / Social Sciences',
+        papersDescription:
+          'Constitutional Democracy, Human Rights, Entrepreneurship Ethics & National Development Competencies',
+        topics: [
+          'Constitution of Zambia, Rule of Law & Democratic Governance (Form 3–4)',
+          'Human Rights, Gender Equity & Child Protection Frameworks (Form 3–4)',
+          'Anti-Corruption, Financial Integrity & Public Accountability (Form 4)',
+          'Sustainable Development, Climate Justice & Global Citizenship (Form 4)',
+          'A-Level Constitutional Law, Public Policy & Regional Integration (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Business, Accounts & Commerce',
+        code: 'Business & Finance',
+        pathway: 'Business and Finance / Business Studies',
+        papersDescription:
+          'Principles of Accounts, Commerce, Entrepreneurship & A-Level Financial/Management Accounting',
+        topics: [
+          'Entrepreneurship, SME Business Plans & Financial Literacy (Form 3–4)',
+          'Double-Entry Bookkeeping, Trial Balance & Financial Statements (Form 3–4)',
+          'Banking, Digital Mobile Money, Insurance & Home/Foreign Trade (Form 3–4)',
+          'Partnership Accounts, Control Accounts & Ratios (Form 4)',
+          'A-Level Cost & Management Accounting, Budgeting & Variance Analysis (Form 5–6)',
+          'A-Level Business Strategy, Marketing & Corporate Governance (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Geography',
+        code: 'Social Sciences',
+        pathway: 'Social Sciences & Languages',
+        papersDescription:
+          'GIS/Map Interpretation, Physical Geomorphology, Zambian Economic Resources & A-Level Environmental Research',
+        topics: [
+          'Map Work, Contours, Bearings & Introductory GIS Skills (Form 3–4)',
+          'Plate Tectonics, River Systems & Climate Dynamics (Form 3–4)',
+          'Zambian Copperbelt Mining, Hydroelectric Power & Tourism (Form 4)',
+          'Urbanization, Population Dynamics & Sustainable Land Use (Form 4)',
+          'A-Level Hydrology, Atmospheric Systems & Regional Development Research (Form 5–6)',
+        ],
+      },
+      {
+        name: 'History',
+        code: 'Social Sciences',
+        pathway: 'Social Sciences & Languages',
+        papersDescription:
+          'Source Evaluation, Central African Heritage, Zambian Independence & A-Level Modern Global History',
+        topics: [
+          'Pre-Colonial Zambian & Central African Kingdoms (Form 3–4)',
+          'Colonialism, Federation & Zambia’s Independence Struggle (1964) (Form 3–4)',
+          'Post-Independence Nation Building & Southern African Liberation (Form 4)',
+          'World Wars, Cold War & Contemporary Global Diplomacy (Form 4)',
+          'A-Level Historiography, Primary Document Analysis & Research Essays (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Design & Technology',
+        code: 'Technology & Technical',
+        pathway: 'Technology / Technical & Vocational',
+        papersDescription:
+          'CAD/Technical Drawing, Engineering Materials, Product Prototyping & SBA Design Portfolio',
+        topics: [
+          'Orthographic & Isometric Technical Drawing / CAD Basics (Form 3–4)',
+          'Materials Science: Timber, Metals, Polymers & Composites (Form 3–4)',
+          'Structures, Mechanisms, Pneumatics & Basic Electronics (Form 4)',
+          'Design Process Portfolio & Community Problem Prototyping (Form 3–6)',
+          'A-Level Engineering Design, Sustainable Manufacturing & Systems Control (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Food, Nutrition & Hospitality',
+        code: 'Home Economics & Hospitality',
+        pathway: 'Home Economics & Hospitality / Technical',
+        papersDescription:
+          'Practical Culinary Competence, Nutrition Science, Food Safety & Hospitality Entrepreneurship',
+        topics: [
+          'Macronutrients, Micronutrients & Zambian Meal Planning (Form 3–4)',
+          'Food Preservation, Hygiene Standards & Kitchen Management (Form 3–4)',
+          'Hospitality Operations, Customer Service & Tourism Studies (Form 4)',
+          'A-Level Human Nutrition Biochemistry, Dietetics & Food Technology (Form 5–6)',
+        ],
+      },
+      {
+        name: 'Creative Arts & Physical Education',
+        code: 'Arts & Sports Pathways',
+        pathway: 'Performing & Creative Arts / Physical Education & Sports',
+        papersDescription:
+          'Practical Performance, Visual Art & Design Portfolios, Sports Science Anatomy & Coaching',
+        topics: [
+          'Visual Art, Graphic Design & Cultural Heritage Crafts (Form 3–4)',
+          'Music Theory, Composition & Performing Arts Production (Form 3–4)',
+          'Exercise Physiology, Sports Nutrition & Injury Prevention (Form 3–4)',
+          'A-Level Sports Biomechanics, Coaching & Creative Industries Enterprise (Form 5–6)',
+        ],
+      },
+    ],
+    disclaimer:
+      'ScholarSpark AI is an independent study aid aligned with public Zambia Education Curriculum Framework (2023) competence-based concepts and is NOT affiliated with or endorsed by the Ministry of Education, CDC, or ECZ.',
   },
   Cambridge: {
     id: 'Cambridge',
@@ -399,6 +639,56 @@ export const SAMPLE_PRACTICE_QUESTIONS: PracticeQuestion[] = [
     isVerifiedPastPaper: true,
     provenanceLabel: 'Cambridge IGCSE 0625 Paper 2 MCQ Syllabus Format',
   },
+  // Zambia CBC Form 3-4 O-Level Competence-Based Sample
+  {
+    id: 'zcbc-math-f4-01',
+    curriculum: 'ZambiaCBC',
+    grade: 'Form 4 (O-Level)',
+    subject: 'Mathematics',
+    topic: 'Matrices, Linear Programming & Earth Geometry (Form 4)',
+    questionType: 'structured',
+    totalMarks: 4,
+    questionText:
+      'A school cooperative produces two types of solar study lamps: Type A (requires 2 hours assembly, profit K45) and Type B (requires 3 hours assembly, profit K60). At most 24 assembly hours are available daily, and at least 2 Type A and 2 Type B lamps must be made.\nWrite down the system of linear inequalities for x (Type A) and y (Type B), and state the profit objective function P.',
+    modelAnswer:
+      'Constraints:\n1) 2x + 3y <= 24 (assembly time constraint)\n2) x >= 2\n3) y >= 2\nObjective profit function:\nP = 45x + 60y',
+    markingScheme: [
+      { markType: 'B1', criterion: 'Correct assembly constraint inequality: 2x + 3y <= 24' },
+      { markType: 'B1', criterion: 'Minimum production bounds: x >= 2 and y >= 2' },
+      { markType: 'M1', criterion: 'Identifying profit coefficients K45 and K60 correctly' },
+      { markType: 'A1', criterion: 'Correct objective function P = 45x + 60y' },
+    ],
+    explanation:
+      'In the Zambia CBC O-Level pathway, linear programming links algebra to real entrepreneurship decisions: translate resource caps into "<=" inequalities, minimum quotas into ">=" inequalities, and unit profits into P.',
+    hint: 'Multiply hours per lamp by x and y for the 24-hour cap, then express total profit P in Kwacha.',
+    isVerifiedPastPaper: false,
+    provenanceLabel: 'Zambia CBC (Form 3–4 O-Level) Competence-Based Practice',
+  },
+  // Zambia CBC Form 5-6 A-Level STEM Sample
+  {
+    id: 'zcbc-math-f5-01',
+    curriculum: 'ZambiaCBC',
+    grade: 'Form 5 (A-Level)',
+    subject: 'Mathematics',
+    topic: 'A-Level Pure Maths: Calculus (Differential & Integral) (Form 5–6)',
+    questionType: 'structured',
+    totalMarks: 4,
+    questionText:
+      'A curve has equation y = x³ - 6x² + 9x + 2.\nFind dy/dx and determine the x-coordinates of both stationary points on the curve.',
+    modelAnswer:
+      'dy/dx = 3x² - 12x + 9\nAt stationary points, dy/dx = 0:\n3x² - 12x + 9 = 0\nx² - 4x + 3 = 0\n(x - 1)(x - 3) = 0\nStationary points occur at x = 1 and x = 3.',
+    markingScheme: [
+      { markType: 'M1', criterion: 'Differentiating term-by-term to obtain 3x² - 12x + 9' },
+      { markType: 'M1', criterion: 'Setting dy/dx = 0 and simplifying quadratic' },
+      { markType: 'M1', criterion: 'Factorising (x - 1)(x - 3) = 0 or valid quadratic formula' },
+      { markType: 'A1', criterion: 'Both exact roots x = 1 and x = 3' },
+    ],
+    explanation:
+      'At any turning/stationary point on a smooth curve, the gradient dy/dx equals zero. Differentiate first, equate to zero, and solve the resulting quadratic.',
+    hint: 'Use the power rule d/dx(xⁿ) = n·xⁿ⁻¹ and divide the equation by 3 before factoring.',
+    isVerifiedPastPaper: false,
+    provenanceLabel: 'Zambia CBC (Form 5–6 A-Level STEM) Practice Standard',
+  },
 ];
 
 // Curated starter flashcard decks
@@ -471,9 +761,57 @@ export const STARTER_FLASHCARD_DECKS: FlashcardDeck[] = [
       },
     ],
   },
+  {
+    id: 'deck-zcbc-stem-1',
+    title: 'Zambia CBC Form 1–6 STEM & Competence Core',
+    curriculum: 'ZambiaCBC',
+    subject: 'Physics',
+    topic: 'Mechanics, Electricity & A-Level Fields',
+    createdAt: new Date().toISOString(),
+    cards: [
+      {
+        id: 'c7',
+        front: 'In Form 1–4 Competence Physics, how is electrical power related to current, voltage, and resistance?',
+        back: 'P = VI = I²R = V²/R (measured in Watts, W).',
+        tip: 'Use P = I²R when analysing power loss in Zambian high-voltage transmission lines.',
+        difficulty: 'easy',
+        status: 'unreviewed',
+      },
+      {
+        id: 'c8',
+        front: 'How are Forms 1–3 assessed compared to Form 4 and Forms 5–6 in the 2023 Zambia CBC?',
+        back: 'Forms 1–3 build foundational pathway skills measured through Term 1 and Term 2 School-Based Assessments, Form 4 completes O-Level certification, and Forms 5–6 specialize in up to 4 A-Level subjects.',
+        tip: 'Keep Term 1 & Term 2 practical project logs organized from Form 1.',
+        difficulty: 'medium',
+        status: 'unreviewed',
+      },
+      {
+        id: 'c9',
+        front: 'In Form 5–6 A-Level Mechanics, state Newton’s Second Law in terms of momentum.',
+        back: 'The resultant force acting on a body is directly proportional to the rate of change of linear momentum (F = Δp / Δt), and acts in the direction of the force.',
+        tip: 'F = ma only holds when mass is constant; F = Δp / Δt is universally valid.',
+        difficulty: 'hard',
+        status: 'unreviewed',
+      },
+    ],
+  },
 ];
 
-// Sample target exam dates
+// Real private schools operating in Zambia (ISAZ / MOE registered)
+export const ZAMBIAN_PRIVATE_SCHOOLS: string[] = [
+  'Rhodes Park School (Lusaka)',
+  'Baobab College (Lusaka)',
+  'Lusaka International Community School (LICS) (Lusaka)',
+  'Lechwe School (Kitwe)',
+  'Mpelembe Secondary School (Kitwe)',
+  'Ndola Trust School (Ndola)',
+  'Chengelo School (Mkushi)',
+  'Trident College (Solwezi)',
+  'Chalo Trust School (Lusaka)',
+  'Crested Crane Academy (Lusaka)',
+];
+
+// Sample target exam & Form 1-3 term assessment dates
 export const DEFAULT_EXAM_DATES: ExamCountdownItem[] = [
   {
     id: 'exam-1',
@@ -483,6 +821,7 @@ export const DEFAULT_EXAM_DATES: ExamCountdownItem[] = [
     examDate: '2026-11-16T08:30:00',
     targetGrade: 'Distinction (1)',
     notes: 'Revise matrices, earth geometry, and transformations. No calculators permitted.',
+    assessmentKind: 'final_exam',
   },
   {
     id: 'exam-2',
@@ -492,6 +831,7 @@ export const DEFAULT_EXAM_DATES: ExamCountdownItem[] = [
     examDate: '2026-11-20T08:30:00',
     targetGrade: 'Distinction (1)',
     notes: 'Focus on moments, electricity circuits, transformers, and radioactivity formulas.',
+    assessmentKind: 'final_exam',
   },
   {
     id: 'exam-3',
@@ -501,6 +841,7 @@ export const DEFAULT_EXAM_DATES: ExamCountdownItem[] = [
     examDate: '2026-10-30T09:00:00',
     targetGrade: 'A*',
     notes: 'Non-calculator paper, speed is vital. Focus on algebra, vectors, and trigonometry.',
+    assessmentKind: 'final_exam',
   },
   {
     id: 'exam-4',
@@ -510,5 +851,49 @@ export const DEFAULT_EXAM_DATES: ExamCountdownItem[] = [
     examDate: '2026-11-05T13:30:00',
     targetGrade: 'A*',
     notes: 'Include units in all final numbers. Focus on thermal physics and electromagnetism.',
+    assessmentKind: 'final_exam',
+  },
+  {
+    id: 'exam-5',
+    curriculum: 'ZambiaCBC',
+    subject: 'Mathematics',
+    paperCode: 'Form 4 O-Level Competence Examination',
+    examDate: '2026-11-12T08:30:00',
+    targetGrade: 'Distinction',
+    notes: 'Focus on applied linear programming, vectors, and SBA project portfolio readiness.',
+    assessmentKind: 'final_exam',
+  },
+  {
+    id: 'exam-6',
+    curriculum: 'ZambiaCBC',
+    subject: 'Physics',
+    paperCode: 'Form 6 A-Level STEM Specialist Paper',
+    examDate: '2026-11-18T08:30:00',
+    targetGrade: 'A',
+    notes: 'Review fields, quantum physics, and experimental uncertainty calculations.',
+    assessmentKind: 'final_exam',
+  },
+  {
+    id: 'exam-zcbc-t1',
+    curriculum: 'ZambiaCBC',
+    subject: 'Forms 1–3 Core Subjects',
+    paperCode: 'Term 1 Assessment Test',
+    examDate: '2027-03-19T08:30:00',
+    targetGrade: 'Term 1 Mastery',
+    notes: 'First-term competence assessment test across core and pathway subjects (Forms 1–3).',
+    assessmentKind: 'term_assessment',
+    term: 'Term 1',
+  },
+  {
+    id: 'exam-zcbc-t2',
+    curriculum: 'ZambiaCBC',
+    subject: 'Forms 1–3 Core Subjects',
+    paperCode: 'Term 2 Assessment Test',
+    examDate: '2027-07-23T08:30:00',
+    targetGrade: 'Term 2 Mastery',
+    notes: 'Second-term school-based competence assessment test (Forms 1–3).',
+    assessmentKind: 'term_assessment',
+    term: 'Term 2',
   },
 ];
+

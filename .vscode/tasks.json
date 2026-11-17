@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ensure Dependencies Installed",
+      "type": "shell",
+      "command": "node scripts/ensure-deps.mjs",
+      "windows": {
+        "options": {
+          "shell": {
+            "executable": "cmd.exe",
+            "args": ["/d", "/c"]
+          }
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Start Dev Server",
+      "type": "npm",
+      "script": "dev",
+      "dependsOn": "Ensure Dependencies Installed",
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Type Check (tsc --noEmit)",
+      "type": "npm",
+      "script": "lint",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Run Test Suite",
+      "type": "npm",
+      "script": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Production Bundle",
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": []
+    }
+  ]
+}

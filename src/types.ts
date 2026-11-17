@@ -1,6 +1,13 @@
-export type CurriculumType = 'ECZ' | 'Cambridge';
+export type CurriculumType = 'ECZ' | 'ZambiaCBC' | 'Cambridge';
 
 export type ECZGrade = 'Grade 7' | 'Grade 9' | 'Grade 12' | 'GCE';
+export type ZambiaCBCGrade =
+  | 'Form 1 (O-Level)'
+  | 'Form 2 (O-Level)'
+  | 'Form 3 (O-Level)'
+  | 'Form 4 (O-Level)'
+  | 'Form 5 (A-Level)'
+  | 'Form 6 (A-Level)';
 export type CambridgeGrade = 'IGCSE Core' | 'IGCSE Extended' | 'Cambridge O-Level' | 'Cambridge AS/A-Level';
 
 export type ExplanationDifficulty = 'simple' | 'standard' | 'advanced';
@@ -98,10 +105,12 @@ export interface ExamCountdownItem {
   id: string;
   curriculum: CurriculumType;
   subject: string;
-  paperCode: string; // e.g., "Paper 1 (Non-Calculator)" or "0580/22 Extended"
+  paperCode: string; // e.g., "Paper 1 (Non-Calculator)" or "Term 1 Assessment Test"
   examDate: string; // ISO string e.g. "2026-11-15T09:00:00"
   targetGrade?: string;
   notes?: string;
+  assessmentKind?: 'final_exam' | 'term_assessment';
+  term?: 'Term 1' | 'Term 2';
 }
 
 export interface SavedNote {

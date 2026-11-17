@@ -160,3 +160,27 @@ export async function requestApi<T>(
 
   throw lastError || new Error('Request could not be completed.');
 }
+
+export async function downloadVsCodeProjectBundle(): Promise<void> {
+  const res = await fetch(buildUrl('/api/export/vscode-bundle'));
+  const contentType = res.headers.get('content-type') || '';
+  if (!res.ok || !contentType.includes('application/zip')) {
+    if (res.status === 404 || !contentType.includes('application/zip')) {
+      throw new Error(
+        'VS Code ZIP export requires an active ScholarSpark backend server. If you are on GitHub Pages, download the repository ZIP from GitHub or connect your Cloud Run backend URL above.'
+      );
+    }
+    throw new Error(`Export failed with HTTP ${res.status}.`);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ScholarSpark-AI-VSCode.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+

@@ -17,7 +17,6 @@ import {
   HardDriveDownload,
   Settings,
   ChevronRight,
-  Sparkles,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -44,11 +43,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileMenuOpen, setMobileMenuO
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'tutor', label: 'AI Tutor', icon: MessageSquareText, badge: 'Syllabus' },
+    { id: 'tutor', label: 'AI Tutor', icon: MessageSquareText },
     { id: 'practice', label: 'Exam Practice', icon: FileCheck2 },
-    { id: 'pastpapers', label: 'Past Paper Trainer', icon: BookOpenCheck, badge: 'Verified' },
-    { id: 'scanner', label: 'Homework Scanner', icon: ScanLine, badge: 'OCR' },
-    { id: 'voice', label: 'Voice Tutor', icon: Mic, badge: 'Audio' },
+    { id: 'pastpapers', label: 'Past Paper Trainer', icon: BookOpenCheck },
+    { id: 'scanner', label: 'Homework Scanner', icon: ScanLine },
+    { id: 'voice', label: 'Voice Tutor', icon: Mic },
     {
       id: 'weakness',
       label: 'Weakness Detector',
@@ -63,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileMenuOpen, setMobileMenuO
       icon: CalendarDays,
       badge: pendingTasks > 0 ? `${pendingTasks}` : undefined,
     },
-    { id: 'challenge', label: 'Challenge Mode', icon: Flame, badge: 'Timed' },
+    { id: 'challenge', label: 'Challenge Mode', icon: Flame },
     { id: 'notes', label: 'Notes Summarizer', icon: FileText },
     { id: 'reports', label: 'Progress Reports', icon: LineChart },
     { id: 'countdown', label: 'Exam Countdown', icon: Clock },
@@ -106,10 +105,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileMenuOpen, setMobileMenuO
               <button
                 key={item.id}
                 onClick={() => handleSelect(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
                   isActive
-                    ? 'bg-gradient-to-r from-teal-500/20 to-teal-500/5 text-teal-300 border-l-4 border-teal-400 shadow-xs'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                    ? 'bg-slate-800/80 text-teal-300 border-l-2 border-teal-400'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                 }`}
               >
                 <div className="flex items-center gap-3 truncate">

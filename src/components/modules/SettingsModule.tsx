@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { ZAMBIAN_PRIVATE_SCHOOLS } from '../../data/curriculums';
 import {
   getApiBaseUrl,
   setCustomApiBaseUrl,
   checkBackendHealth,
   fetchQuotaStatus,
+  downloadVsCodeProjectBundle,
 } from '../../services/api';
 import {
   Settings,
@@ -15,6 +17,7 @@ import {
   Crown,
   CheckCircle2,
   Server,
+  Code2,
 } from 'lucide-react';
 
 export const SettingsModule: React.FC = () => {
@@ -39,6 +42,8 @@ export const SettingsModule: React.FC = () => {
   const [backendUrl, setBackendUrl] = useState(getApiBaseUrl());
   const [backendTestMsg, setBackendTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [testingBackend, setTestingBackend] = useState(false);
+  const [downloadingCode, setDownloadingCode] = useState(false);
+  const [downloadCodeMsg, setDownloadCodeMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,6 +88,25 @@ export const SettingsModule: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadVsCodeZip = async () => {
+    setDownloadingCode(true);
+    setDownloadCodeMsg(null);
+    try {
+      await downloadVsCodeProjectBundle();
+      setDownloadCodeMsg({
+        ok: true,
+        text: 'ScholarSpark-AI-VSCode.zip downloaded! Unzip it, open the ScholarSpark-AI folder in VS Code, press F5 (auto-installs packages on first launch), and set GEMINI_API_KEY in .env.',
+      });
+    } catch (err: any) {
+      setDownloadCodeMsg({
+        ok: false,
+        text: err?.message || 'Unable to download VS Code project archive.',
+      });
+    } finally {
+      setDownloadingCode(false);
+    }
+  };
+
   const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -101,15 +125,15 @@ export const SettingsModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Top Banner */}
-      <div className="p-5 rounded-2xl bg-[#0B192C] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-5 rounded-xl bg-[#0B192C] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-teal-500/20 text-teal-400">
+            <span className="p-1.5 rounded-lg bg-teal-500/15 text-teal-400">
               <Settings className="w-5 h-5" />
             </span>
-            <h1 className="text-lg font-bold text-white">Student Profile & Settings</h1>
+            <h1 className="text-lg font-bold text-white">Student Profile &amp; Settings</h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Manage your student identity, data backups, backend connection, and usage quota.
@@ -117,10 +141,10 @@ export const SettingsModule: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Profile Form (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="p-6 rounded-2xl bg-[#0F1E36] border border-slate-800 space-y-5 shadow-xl">
+          <div className="p-6 rounded-xl bg-[#0F1E36] border border-slate-800 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
                 <User className="w-4 h-4 text-teal-400" /> Student Profile Information
@@ -146,15 +170,31 @@ export const SettingsModule: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-300">
                   School or Examination Center:
                 </label>
+                <select
+                  value={ZAMBIAN_PRIVATE_SCHOOLS.includes(school) ? school : '__custom__'}
+                  onChange={(e) => {
+                    if (e.target.value !== '__custom__') {
+                      setSchool(e.target.value);
+                    }
+                  }}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-teal-400"
+                >
+                  <option value="__custom__">Custom / Other School (Type below)</option>
+                  {ZAMBIAN_PRIVATE_SCHOOLS.map((schoolName) => (
+                    <option key={schoolName} value={schoolName}>
+                      {schoolName}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   value={school}
                   onChange={(e) => setSchool(e.target.value)}
-                  placeholder="e.g. David Kaunda Technical, Kabulonga Boys, or International School"
+                  placeholder="e.g. Rhodes Park School (Lusaka), Baobab College, or custom center"
                   className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-teal-400"
                 />
               </div>
@@ -184,7 +224,8 @@ export const SettingsModule: React.FC = () => {
                     onChange={(e) => setCurriculum(e.target.value as any)}
                     className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-teal-400"
                   >
-                    <option value="ECZ">ECZ (Examinations Council of Zambia)</option>
+                    <option value="ECZ">ECZ (Examinations Council of Zambia · Grades 7–12)</option>
+                    <option value="ZambiaCBC">Zambia CBC (2023 Competence-Based · Forms 1–6)</option>
                     <option value="Cambridge">Cambridge IGCSE / International</option>
                   </select>
                 </div>
@@ -192,7 +233,7 @@ export const SettingsModule: React.FC = () => {
 
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition-colors shadow-md shadow-teal-500/20"
+                className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition-colors"
               >
                 Save Profile Changes
               </button>
@@ -200,9 +241,9 @@ export const SettingsModule: React.FC = () => {
           </div>
 
           {/* Data Ownership & Security Card */}
-          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2 text-xs text-slate-300">
+          <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2 text-xs text-slate-300">
             <div className="font-bold text-white flex items-center gap-1.5 text-teal-400">
-              <Shield className="w-4 h-4" /> Privacy & Local-First Security Architecture
+              <Shield className="w-4 h-4" /> Privacy &amp; Local-First Security Architecture
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
               ScholarSpark AI is architected with privacy-by-design. Your practice attempts, flashcard ratings, and notes are stored locally in your browser with zero password exposure. No student personal information or homework images are sold or permanently retained on cloud servers.
@@ -213,7 +254,7 @@ export const SettingsModule: React.FC = () => {
         {/* Right: Plan Status, Backend Endpoint & Backups (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
           {/* Plan Status */}
-          <div className="p-6 rounded-2xl bg-[#0F1E36] border border-slate-800 space-y-4 shadow-xl">
+          <div className="p-6 rounded-xl bg-[#0F1E36] border border-slate-800 space-y-4">
             <h3 className="font-bold text-sm text-white flex items-center gap-2">
               <Crown className="w-4 h-4 text-amber-400" /> Plan & Usage
             </h3>
@@ -245,7 +286,7 @@ export const SettingsModule: React.FC = () => {
           </div>
 
           {/* Connected Backend Server (for GitHub Pages static branch hosts) */}
-          <div className="p-6 rounded-2xl bg-[#0F1E36] border border-slate-800 space-y-3 shadow-xl">
+          <div className="p-6 rounded-xl bg-[#0F1E36] border border-slate-800 space-y-3">
             <h3 className="font-bold text-sm text-white flex items-center gap-2">
               <Server className="w-4 h-4 text-teal-400" /> AI Backend Connection
             </h3>
@@ -282,9 +323,9 @@ export const SettingsModule: React.FC = () => {
           </div>
 
           {/* Backup & Data Export */}
-          <div className="p-6 rounded-2xl bg-[#0F1E36] border border-slate-800 space-y-4 shadow-xl">
+          <div className="p-6 rounded-xl bg-[#0F1E36] border border-slate-800 space-y-4">
             <h3 className="font-bold text-sm text-white flex items-center gap-2">
-              <Download className="w-4 h-4 text-teal-400" /> Data Backup & Migration
+              <Download className="w-4 h-4 text-teal-400" /> Data Backup &amp; Migration
             </h3>
 
             {importStatus && (
@@ -296,7 +337,7 @@ export const SettingsModule: React.FC = () => {
             <div className="space-y-2">
               <button
                 onClick={handleExportBackup}
-                className="w-full py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition-colors shadow-xs flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition-colors flex items-center justify-center gap-2"
               >
                 <Download className="w-4 h-4" />
                 <span>Export Full Data Backup (JSON)</span>
@@ -313,6 +354,40 @@ export const SettingsModule: React.FC = () => {
                 />
               </label>
             </div>
+          </div>
+
+          {/* Local VS Code Downloadable Package */}
+          <div className="p-6 rounded-xl bg-[#0F1E36] border border-slate-800 space-y-3">
+            <h3 className="font-bold text-sm text-white flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-teal-400" /> Run Locally in VS Code
+            </h3>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Download the complete full-stack source code pre-configured with{' '}
+              <span className="font-mono text-slate-300">.vscode/</span> launch debugging, tasks, and{' '}
+              <span className="font-mono text-slate-300">VSCODE_SETUP.md</span>.
+            </p>
+            <button
+              type="button"
+              onClick={handleDownloadVsCodeZip}
+              disabled={downloadingCode}
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-teal-500/40 text-teal-300 font-bold text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              <span>
+                {downloadingCode ? 'Packaging VS Code Archive...' : 'Download VS Code Project (.zip)'}
+              </span>
+            </button>
+            {downloadCodeMsg && (
+              <div
+                className={`p-2.5 rounded-lg text-[11px] border leading-relaxed ${
+                  downloadCodeMsg.ok
+                    ? 'bg-emerald-950/50 border-emerald-800 text-emerald-300'
+                    : 'bg-amber-950/50 border-amber-800 text-amber-300'
+                }`}
+              >
+                {downloadCodeMsg.text}
+              </div>
+            )}
           </div>
         </div>
       </div>
